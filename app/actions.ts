@@ -178,6 +178,60 @@ export async function payRecurringItem(id: string) {
   }
 }
 
+export async function saveBankAccount(input: { id?: string; name: string; amount: number; note: string }) {
+  if (!(await auth.api.getSession({ headers: await headers() }))) return { success: false as const, message: "Sesija je istekla." };
+  const name = typeof input?.name === "string" ? input.name.trim() : "";
+  const note = typeof input?.note === "string" ? input.note.trim() : "";
+  if (!name || name.length > 100 || note.length > 200 || !Number.isFinite(input?.amount) || input.amount < 0 || input.amount > 9_999_999_999.99) {
+    return { success: false as const, message: "Unesite naziv i ispravan iznos." };
+  }
+  try {
+    const data = { name, amount: input.amount.toFixed(2), note };
+    const item = input.id ? await prisma.bankAccount.update({ where: { id: input.id }, data }) : await prisma.bankAccount.create({ data });
+    return { success: true as const, account: { id: item.id, name: item.name, amount: Number(item.amount), note: item.note, deductions: [] } };
+  } catch (error) {
+    console.error("Neuspješno čuvanje bankovnog računa.", error);
+    return { success: false as const, message: "Bankovni račun nije sačuvan." };
+  }
+}
+
+export async function deleteBankAccount(id: string) {
+  if (!(await auth.api.getSession({ headers: await headers() }))) return { success: false as const, message: "Sesija je istekla." };
+  try {
+    await prisma.bankAccount.delete({ where: { id } });
+    return { success: true as const };
+  } catch (error) {
+    console.error("Neuspješno uklanjanje bankovnog računa.", error);
+    return { success: false as const, message: "Račun nije uklonjen." };
+  }
+}
+
+export async function addBankDeduction(input: { accountId: string; description: string; amount: number }) {
+  if (!(await auth.api.getSession({ headers: await headers() }))) return { success: false as const, message: "Sesija je istekla." };
+  const description = typeof input?.description === "string" ? input.description.trim() : "";
+  if (!input.accountId || !description || description.length > 120 || !Number.isFinite(input.amount) || input.amount <= 0 || input.amount > 9_999_999_999.99) {
+    return { success: false as const, message: "Unesite opis i ispravan iznos odbitka." };
+  }
+  try {
+    const item = await prisma.bankDeduction.create({ data: { accountId: input.accountId, description, amount: input.amount.toFixed(2) } });
+    return { success: true as const, deduction: { id: item.id, description: item.description, amount: Number(item.amount) } };
+  } catch (error) {
+    console.error("Neuspješno čuvanje bankovnog odbitka.", error);
+    return { success: false as const, message: "Odbitak nije sačuvan." };
+  }
+}
+
+export async function deleteBankDeduction(id: string) {
+  if (!(await auth.api.getSession({ headers: await headers() }))) return { success: false as const, message: "Sesija je istekla." };
+  try {
+    await prisma.bankDeduction.delete({ where: { id } });
+    return { success: true as const };
+  } catch (error) {
+    console.error("Neuspješno uklanjanje bankovnog odbitka.", error);
+    return { success: false as const, message: "Odbitak nije uklonjen." };
+  }
+}
+
 export async function saveBudget(input: import("@/lib/budget").BudgetSettings) {
  if (!(await auth.api.getSession({ headers: await headers() }))) {
   return { success: false as const, message: "Sesija je istekla. Prijavite se ponovo." };

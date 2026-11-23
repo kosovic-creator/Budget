@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { serializeTransaction } from "@/lib/transactions";
 import type { PlannedItem } from "@/lib/planned-items";
 import type { RecurringItem } from "@/lib/recurring-items";
+import type { BankAccount } from "@/lib/bank";
 
 export default function HomePage() {
   return (
@@ -24,17 +25,18 @@ async function DatabaseDashboard() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/sign-in");
 
-  const { transactions, budget, plannedItems, recurringItems } = await loadDashboardData();
-  return <Dashboard initialTransactions={transactions} initialBudget={budget} initialPlannedItems={plannedItems} initialRecurringItems={recurringItems} userName={session.user.name} />;
+  const { transactions, budget, plannedItems, recurringItems, bankAccounts } = await loadDashboardData();
+  return <Dashboard initialTransactions={transactions} initialBudget={budget} initialPlannedItems={plannedItems} initialRecurringItems={recurringItems} initialBankAccounts={bankAccounts} userName={session.user.name} />;
 }
 
 async function loadDashboardData() {
   try {
-    const [records, saved, savedPlannedItems, savedRecurringItems] = await Promise.all([
+    const [records, saved, savedPlannedItems, savedRecurringItems, savedBankAccounts] = await Promise.all([
       prisma.transaction.findMany({ orderBy: { date: "desc" } }),
       prisma.budgetSettings.findUnique({ where: { id: "default" } }),
       prisma.plannedItem.findMany({ orderBy: { createdAt: "asc" } }),
       prisma.recurringItem.findMany({ orderBy: { createdAt: "asc" } }),
+      prisma.bankAccount.findMany({ include: { deductions: { orderBy: { createdAt: "asc" } } }, orderBy: { createdAt: "asc" } }),
     ]);
     const numberOrZero = (value: unknown) => {
       const number = Number(value ?? 0);
@@ -62,7 +64,14 @@ async function loadDashboardData() {
       amount: Number(item.amount),
       kind: item.kind === "FIXED" ? "fixed" : "subscription",
     }));
-    return { transactions: records.map(serializeTransaction), budget, plannedItems, recurringItems };
+    const bankAccounts: BankAccount[] = savedBankAccounts.map((account) => ({
+      id: account.id,
+      name: account.name,
+      amount: Number(account.amount),
+      note: account.note,
+      deductions: account.deductions.map((deduction) => ({ id: deduction.id, description: deduction.description, amount: Number(deduction.amount) })),
+    }));
+    return { transactions: records.map(serializeTransaction), budget, plannedItems, recurringItems, bankAccounts };
   } catch (error) {
     console.error("Neuspješno učitavanje transakcija iz Neon baze.", error);
     throw new Error("Transakcije trenutno nije moguće učitati iz baze.");

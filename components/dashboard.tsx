@@ -11,7 +11,6 @@ import {
   Landmark,
   LayoutGrid,
   Plus,
-  ReceiptText,
   Search,
   Settings,
   Target,
@@ -37,6 +36,8 @@ import { authClient } from "@/lib/auth-client";
 import type { PlannedItem, PlannedItemKind } from "@/lib/planned-items";
 import type { RecurringItem } from "@/lib/recurring-items";
 import MonthlyExpenses from "@/components/monthly-expenses";
+import BankAccounts from "@/components/bank-accounts";
+import type { BankAccount } from "@/lib/bank";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return twMerge(clsx(classes));
@@ -63,10 +64,11 @@ interface DashboardProps {
   initialBudget: BudgetSettings;
   initialPlannedItems: PlannedItem[];
   initialRecurringItems: RecurringItem[];
+  initialBankAccounts: BankAccount[];
   userName: string;
 }
 
-export default function Dashboard({ initialTransactions, initialBudget, initialPlannedItems, initialRecurringItems, userName }: DashboardProps) {
+export default function Dashboard({ initialTransactions, initialBudget, initialPlannedItems, initialRecurringItems, initialBankAccounts, userName }: DashboardProps) {
   const router = useRouter();
   const [budget, setBudget] = useState(initialBudget);
   const [editingBudget, setEditingBudget] = useState(false);
@@ -254,16 +256,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
             { label: "Pregled", icon: LayoutGrid },
             { label: "Mjesečni troškovi", icon: Target },
             { label: "Pretplate", icon: CreditCard },
-            { label: "Transakcije", icon: ReceiptText },
+            { label: "Banka", icon: Landmark },
           ].map((item) => (
             <button
               key={item.label}
-              onClick={() => {
-                if (item.label === "Transakcije") {
-                  setActiveNav("Pregled");
-                  setTimeout(() => document.getElementById("transactions")?.scrollIntoView({ behavior: "smooth" }), 0);
-                } else setActiveNav(item.label);
-              }}
+              onClick={() => setActiveNav(item.label)}
               className={cn(
                 "flex h-11 w-full items-center gap-3 rounded-lg px-3 text-[14px] font-medium transition",
                 activeNav === item.label ? "bg-[#eef0f2] text-[#202124]" : "text-[#777b82] hover:bg-[#f5f6f7]",
@@ -426,8 +423,10 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         </div>
         ) : activeNav === "Mjesečni troškovi" ? (
           <MonthlyExpenses view="fixed" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} />
-        ) : (
+        ) : activeNav === "Pretplate" ? (
           <MonthlyExpenses view="subscription" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} />
+        ) : (
+          <BankAccounts initialAccounts={initialBankAccounts} />
         )}
       </main>
 
@@ -436,16 +435,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
           { label: "Pregled", icon: Home },
           { label: "Mjesečni troškovi", icon: Target },
           { label: "Pretplate", icon: CreditCard },
-          { label: "Transakcije", icon: ReceiptText },
+          { label: "Banka", icon: Landmark },
         ].map((item) => (
           <button
             key={item.label}
-            onClick={() => {
-              if (item.label === "Transakcije") {
-                setActiveNav("Pregled");
-                setTimeout(() => document.getElementById("transactions")?.scrollIntoView({ behavior: "smooth" }), 0);
-              } else setActiveNav(item.label);
-            }}
+            onClick={() => setActiveNav(item.label)}
             className={cn(
               "flex min-h-12 flex-col items-center justify-center gap-1 px-0.5 text-[9px] font-semibold",
               activeNav === item.label ? "text-[#202124]" : "text-[#92969b]",
