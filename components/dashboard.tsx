@@ -118,6 +118,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const [transactions, setTransactions] = useState(initialTransactions);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [newTransactionType, setNewTransactionType] = useState<"income" | "expense">("expense");
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [plannedItems, setPlannedItems] = useState(initialPlannedItems);
@@ -148,6 +149,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const monthlyExpensesTotal = fixedExpensesTotal + subscriptionsTotal;
   const transactionBalance = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
   const totalBalance = budget.otp + nlbAvailable + budget.cash + additionsTotal - expectedExpensesTotal + transactionBalance;
+  const availableAfterPlans = totalBalance - monthlyExpensesTotal - budget.household - budget.personal;
 
   async function addPlannedItem(event: React.FormEvent<HTMLFormElement>, kind: PlannedItemKind) {
     event.preventDefault();
@@ -200,10 +202,9 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
     const form = new FormData(event.currentTarget);
     const typeValue = form.get("type");
     const title = String(form.get("title") ?? "").trim();
-    const categoryValue = form.get("category");
+    const categoryValue = newTransactionType === "income" ? "Plata" : form.get("category");
     const amount = Number(form.get("amount"));
     if (
-      !title ||
       !amount ||
       (typeValue !== "income" && typeValue !== "expense") ||
       !isTransactionCategory(categoryValue)
@@ -310,7 +311,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
               <Bell size={17} />
             </button>
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => { setNewTransactionType("expense"); setFormError(""); setIsModalOpen(true); }}
               className="ml-1 flex h-10 w-10 items-center justify-center gap-2 rounded-lg bg-[#202124] text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#34363a] sm:w-auto sm:px-4"
             >
               <Plus size={18} /> <span className="hidden sm:inline">Nova transakcija</span>
@@ -329,21 +330,13 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
           <section id="overview" className="grid grid-cols-1 gap-3 min-[430px]:grid-cols-2 md:gap-4 xl:grid-cols-3">
             <SummaryCard title="Ukupno stanje" value={`${totalBalance < 0 ? "−" : ""}${formatMoney(totalBalance)} €`} icon={<WalletCards size={18} />} tone="dark" trend="Nakon očekivanih troškova" />
             <SummaryCard title="OTP račun" value={`${formatMoney(budget.otp)} €`} icon={<Landmark size={18} />} trend="Stanje na računu" />
-            <SummaryCard title="NLB račun" value={`${formatMoney(budget.nlb)} €`} icon={<Landmark size={18} />} trend="Ukupno na računu" />
             <SummaryCard title="NLB umanjeno" value={`${nlbAvailable < 0 ? "−" : ""}${formatMoney(nlbAvailable)} €`} icon={<Landmark size={18} />} trend="NLB − 1.300 €" />
             <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<WalletCards size={18} />} trend="Gotovina" />
             <SummaryCard title="Mjesečni troškovi" value={`${formatMoney(monthlyExpensesTotal)} €`} icon={<Target size={18} />} trend={`${formatMoney(fixedExpensesTotal)} € fiksni + ${formatMoney(subscriptionsTotal)} € pretplate`} />
+            <SummaryCard title="Dodaci" value={`${formatMoney(additionsTotal)} €`} icon={<ArrowDownLeft size={18} />} trend="Sigurni budući prilivi" />
+            <SummaryCard title="Očekivani troškovi" value={`${formatMoney(expectedExpensesTotal)} €`} icon={<ArrowUpRight size={18} />} trend="Oduzeti od ukupnog stanja" />
+            <SummaryCard title="Slobodno nakon planova" value={`${availableAfterPlans < 0 ? "−" : ""}${formatMoney(availableAfterPlans)} €`} icon={<Target size={18} />} tone={availableAfterPlans < 0 ? "danger" : availableAfterPlans === 0 ? "success" : "info"} trend="Stanje − mjesečni troškovi − kućni i lični limit" />
           </section>
-
-          <section className="mt-3 grid gap-3 md:mt-4 md:grid-cols-2 md:gap-4">
-            <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onDelete={removePlannedItem} />
-            <PlannedItemsCard title="Očekivani troškovi" subtitle="Oduzimaju se od ukupnog stanja" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onDelete={removePlannedItem} />
-          </section>
-          {plannedItemMessage && <p role="alert" className="mt-3 rounded-xl bg-[#f7eeee] px-4 py-3 text-sm text-[#9b3d3d]">{plannedItemMessage}</p>}
-
-          <p className="mt-3 rounded-xl border border-[#e7e8ea] bg-white px-4 py-3 text-xs text-[#686b70] md:mt-4 md:text-sm">
-            <span className="font-bold text-[#202124]">Obračun:</span> OTP + (NLB − 1.300 €) + keš + zbir dodataka − zbir očekivanih troškova + prilivi − odlivi = <span className="font-bold text-[#202124]">{totalBalance < 0 ? "−" : ""}{formatMoney(totalBalance)} €</span>
-          </p>
 
           <section className="mt-3 md:mt-4">
             <div id="plans" className="scroll-mt-20 rounded-xl border border-[#e7e8ea] bg-white p-4 md:p-6">
@@ -352,7 +345,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                   <p className="text-[13px] font-semibold text-[#777b82]">Mjesečni limiti troškova</p>
                   <p className="mt-1 text-[11px] text-[#a2a4a8]">Za svaku kategoriju vidiš potrošeno, limit i preostali iznos.</p>
                 </div>
-                <button onClick={() => { setEditingBudget(!editingBudget); setBudgetMessage(""); }} disabled={budgetSaving} className="rounded-lg border border-[#e5e6e8] px-3 py-2 text-xs font-semibold">{editingBudget ? "Otkaži" : "Uredi stanje i plan"}</button>
+                <button onClick={() => { setEditingBudget(!editingBudget); setBudgetMessage(""); }} disabled={budgetSaving} className="rounded-lg border border-[#e5e6e8] px-3 py-2 text-xs font-semibold">{editingBudget ? "Završi unos" : "Unos stanja i plana"}</button>
               </div>
               <div className="mt-4 space-y-4 md:mt-5 md:space-y-5">
                 {([
@@ -363,6 +356,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                   return <BudgetRow key={label} label={label} spent={spent} total={total} percent={total > 0 ? Math.min(100, spent / total * 100) : 0} color={color} />;
                 })}
                 {editingBudget && (
+                  <>
                   <form onSubmit={submitBudget} className="grid gap-3 border-t border-[#e7e8ea] pt-4 sm:grid-cols-2">
                     {([
                       ["otp", "Stanje na OTP računu"],
@@ -379,6 +373,12 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                     <p className="rounded-lg bg-[#f4f5f7] px-3 py-3 text-xs text-[#686b70] sm:col-span-2">NLB raspoloživo se računa automatski: uneseno stanje minus 1.300 €.</p>
                     <button disabled={budgetSaving} className="rounded-lg bg-[#202124] px-4 py-3 text-xs font-bold text-white disabled:opacity-60 sm:col-span-2">{budgetSaving ? "Čuvanje..." : "Sačuvaj stanje i plan"}</button>
                   </form>
+                  <div className="grid gap-3 border-t border-[#e7e8ea] pt-4 md:grid-cols-2">
+                    <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onDelete={removePlannedItem} />
+                    <PlannedItemsCard title="Očekivani troškovi" subtitle="Oduzimaju se od ukupnog stanja" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onDelete={removePlannedItem} />
+                  </div>
+                  {plannedItemMessage && <p role="alert" className="rounded-xl bg-[#f7eeee] px-4 py-3 text-sm text-[#9b3d3d]">{plannedItemMessage}</p>}
+                  </>
                 )}
                 {budgetMessage && <p role="status" className="text-sm">{budgetMessage}</p>}
               </div>
@@ -471,32 +471,32 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
             </div>
             <div className="mt-5 grid grid-cols-2 gap-2 rounded-xl bg-[#f3f4f5] p-1">
               <label className="cursor-pointer">
-                <input type="radio" name="type" value="expense" defaultChecked className="peer sr-only" />
+                <input type="radio" name="type" value="expense" checked={newTransactionType === "expense"} onChange={() => setNewTransactionType("expense")} className="peer sr-only" />
                 <span className="flex h-9 items-center justify-center rounded-lg text-[12px] font-bold text-[#83878c] peer-checked:bg-white peer-checked:text-[#34363a] peer-checked:shadow-sm">Odliv</span>
               </label>
               <label className="cursor-pointer">
-                <input type="radio" name="type" value="income" className="peer sr-only" />
+                <input type="radio" name="type" value="income" checked={newTransactionType === "income"} onChange={() => setNewTransactionType("income")} className="peer sr-only" />
                 <span className="flex h-9 items-center justify-center rounded-lg text-[12px] font-bold text-[#83878c] peer-checked:bg-white peer-checked:text-[#34363a] peer-checked:shadow-sm">Priliv</span>
               </label>
             </div>
             <label className="mt-4 block text-[12px] font-semibold text-[#686b70]">
               Naziv
-              <input name="title" required placeholder="npr. Kupovina namirnica" className="mt-2 h-11 w-full rounded-lg border border-[#e2e4e6] px-3 text-[14px] outline-none focus:border-[#9fa9a1]" />
+              <input name="title" placeholder={newTransactionType === "income" ? "Opcionalno, npr. Plata" : "Opcionalno, npr. Kupovina namirnica"} className="mt-2 h-11 w-full rounded-lg border border-[#e2e4e6] px-3 text-[14px] outline-none focus:border-[#9fa9a1]" />
             </label>
-            <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className={cn("mt-4 grid gap-3", newTransactionType === "expense" ? "grid-cols-1 min-[390px]:grid-cols-2" : "grid-cols-1")}>
               <label className="text-[12px] font-semibold text-[#686b70]">
                 Iznos (€)
                 <input name="amount" required type="number" min="0.01" step="0.01" placeholder="0.00" className="mt-2 h-11 w-full rounded-lg border border-[#e2e4e6] px-3 text-[14px] outline-none focus:border-[#9fa9a1]" />
               </label>
-              <label className="text-[12px] font-semibold text-[#686b70]">
-                Kategorija
-                <select name="category" className="mt-2 h-11 w-full rounded-lg border border-[#e2e4e6] px-3 text-[13px] outline-none focus:border-[#9fa9a1]">
-                  <option>Kućni troškovi</option>
-                  <option>Lični troškovi</option>
-                  <option>Plata</option>
-                  <option>Ostalo</option>
-                </select>
-              </label>
+              {newTransactionType === "expense" ? (
+                <label className="text-[12px] font-semibold text-[#686b70]">
+                  Kategorija
+                  <select name="category" className="mt-2 h-11 w-full rounded-lg border border-[#e2e4e6] px-3 text-[13px] outline-none focus:border-[#9fa9a1]">
+                    <option>Kućni troškovi</option>
+                    <option>Lični troškovi</option>
+                  </select>
+                </label>
+              ) : null}
             </div>
             <button type="submit" disabled={isSaving} className="mt-6 h-11 w-full rounded-lg bg-[#202124] text-[13px] font-bold text-white hover:bg-[#34363a] disabled:cursor-not-allowed disabled:opacity-60">
               {isSaving ? "Čuvanje..." : "Sačuvaj transakciju"}
@@ -517,7 +517,7 @@ interface SummaryCardProps {
   title: string;
   value: string;
   icon: React.ReactNode;
-  tone?: "dark";
+  tone?: "dark" | "danger" | "success" | "info";
   trend: string;
 }
 
@@ -580,15 +580,23 @@ function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, savin
 }
 
 function SummaryCard({ title, value, icon, tone, trend }: SummaryCardProps) {
+  const colored = Boolean(tone);
   return (
-    <div className={cn("min-h-[112px] min-w-0 rounded-xl border p-3.5 sm:min-h-[132px] sm:p-5", tone === "dark" ? "border-[#202124] bg-[#202124] text-white" : "border-[#e7e8ea] bg-white")}>
+    <div className={cn(
+      "min-h-[112px] min-w-0 rounded-xl border p-3.5 sm:min-h-[132px] sm:p-5",
+      !tone && "border-[#e7e8ea] bg-white",
+      tone === "dark" && "border-[#202124] bg-[#202124] text-white",
+      tone === "danger" && "border-[#b83b3b] bg-[#b83b3b] text-white",
+      tone === "success" && "border-[#31724a] bg-[#31724a] text-white",
+      tone === "info" && "border-[#2767a7] bg-[#2767a7] text-white",
+    )}>
       <div className="flex items-center justify-between">
-        <p className={cn("text-[10px] font-semibold leading-tight sm:text-[12px]", tone === "dark" ? "text-[#c8cbd0]" : "text-[#85888d]")}>{title}</p>
-        <div className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg sm:h-8 sm:w-8", tone === "dark" ? "bg-white/10 text-white" : "bg-[#f2f3f4] text-[#777b82]")}>{icon}</div>
+        <p className={cn("text-[10px] font-semibold leading-tight sm:text-[12px]", colored ? "text-white/80" : "text-[#85888d]")}>{title}</p>
+        <div className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg sm:h-8 sm:w-8", colored ? "bg-white/10 text-white" : "bg-[#f2f3f4] text-[#777b82]")}>{icon}</div>
       </div>
       <div className="mt-3 sm:mt-5">
         <p className="whitespace-nowrap text-[17px] font-bold tracking-tight sm:text-[23px]">{value}</p>
-        <span className={cn("mt-1 block min-h-4 text-[9px] font-bold leading-tight sm:text-[10px]", tone === "dark" ? "text-[#bfc9c1]" : "text-[#72917a]")}>{trend}</span>
+        <span className={cn("mt-1 block min-h-4 text-[9px] font-bold leading-tight sm:text-[10px]", colored ? "text-white/80" : "text-[#72917a]")}>{trend}</span>
       </div>
     </div>
   );

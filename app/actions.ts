@@ -34,13 +34,12 @@ export async function createTransaction(
     };
   }
 
-  const title = input.title.trim();
+  const title = input.title.trim() || (input.type === "income" ? "Priliv" : input.category);
   const validCategory =
     Object.prototype.hasOwnProperty.call(categoryMap, input.category);
   const validType = input.type === "income" || input.type === "expense";
 
   if (
-    !title ||
     !Number.isFinite(input.amount) ||
     input.amount <= 0 ||
     input.amount > 9_999_999_999.99 ||
