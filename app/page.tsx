@@ -7,6 +7,8 @@ import Dashboard from "@/components/dashboard";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serializeTransaction } from "@/lib/transactions";
+import type { PlannedItem } from "@/lib/planned-items";
+import type { RecurringItem } from "@/lib/recurring-items";
 
 export default function HomePage() {
   return (
@@ -22,18 +24,45 @@ async function DatabaseDashboard() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/sign-in");
 
-  const { transactions, budget } = await loadDashboardData();
-  return <Dashboard initialTransactions={transactions} initialBudget={budget} userName={session.user.name} />;
+  const { transactions, budget, plannedItems, recurringItems } = await loadDashboardData();
+  return <Dashboard initialTransactions={transactions} initialBudget={budget} initialPlannedItems={plannedItems} initialRecurringItems={recurringItems} userName={session.user.name} />;
 }
 
 async function loadDashboardData() {
   try {
-    const [records, saved] = await Promise.all([
+    const [records, saved, savedPlannedItems, savedRecurringItems] = await Promise.all([
       prisma.transaction.findMany({ orderBy: { date: "desc" } }),
       prisma.budgetSettings.findUnique({ where: { id: "default" } }),
+      prisma.plannedItem.findMany({ orderBy: { createdAt: "asc" } }),
+      prisma.recurringItem.findMany({ orderBy: { createdAt: "asc" } }),
     ]);
-    const budget = saved ? { household: Number(saved.household), personal: Number(saved.personal), other: Number(saved.other), cash: Number(saved.cash) } : emptyBudget;
-    return { transactions: records.map(serializeTransaction), budget };
+    const numberOrZero = (value: unknown) => {
+      const number = Number(value ?? 0);
+      return Number.isFinite(number) ? number : 0;
+    };
+    const budget = saved ? {
+      household: numberOrZero(saved.household),
+      personal: numberOrZero(saved.personal),
+      other: numberOrZero(saved.other),
+      cash: numberOrZero(saved.cash),
+      otp: numberOrZero(saved.otp),
+      nlb: numberOrZero(saved.nlb),
+      additions: numberOrZero(saved.additions),
+      expectedExpenses: numberOrZero(saved.expectedExpenses),
+    } : emptyBudget;
+    const plannedItems: PlannedItem[] = savedPlannedItems.map((item) => ({
+      id: item.id,
+      description: item.description,
+      amount: Number(item.amount),
+      kind: item.kind === "ADDITION" ? "addition" : "expectedExpense",
+    }));
+    const recurringItems: RecurringItem[] = savedRecurringItems.map((item) => ({
+      id: item.id,
+      name: item.name,
+      amount: Number(item.amount),
+      kind: item.kind === "FIXED" ? "fixed" : "subscription",
+    }));
+    return { transactions: records.map(serializeTransaction), budget, plannedItems, recurringItems };
   } catch (error) {
     console.error("Neuspješno učitavanje transakcija iz Neon baze.", error);
     throw new Error("Transakcije trenutno nije moguće učitati iz baze.");
