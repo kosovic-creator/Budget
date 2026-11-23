@@ -72,6 +72,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const currentPeriod = new Intl.DateTimeFormat("sr-Latn-ME", { month: "long", year: "numeric" }).format(new Date());
   const userInitials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((name) => name[0]).join("").toUpperCase() || "JA";
   const [budget, setBudget] = useState(initialBudget);
+  const [draftBudget, setDraftBudget] = useState(initialBudget);
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetSaving, setBudgetSaving] = useState(false);
   const [budgetMessage, setBudgetMessage] = useState("");
@@ -157,6 +158,8 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const transactionBalance = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
   const totalBalance = budget.otp + nlbAvailable + budget.cash + additionsTotal - expectedExpensesTotal + transactionBalance;
   const availableAfterPlans = totalBalance - monthlyExpensesTotal - budget.household - budget.personal;
+  const draftTotalBalance = draftBudget.otp + (draftBudget.nlb - 1300) + draftBudget.cash + additionsTotal - expectedExpensesTotal + transactionBalance;
+  const draftAvailableAfterPlans = draftTotalBalance - monthlyExpensesTotal - draftBudget.household - draftBudget.personal;
 
   async function addPlannedItem(event: React.FormEvent<HTMLFormElement>, kind: PlannedItemKind) {
     event.preventDefault();
@@ -345,7 +348,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                 <button
                   type={editingBudget ? "submit" : "button"}
                   form={editingBudget ? "budget-settings-form" : undefined}
-                  onClick={editingBudget ? undefined : (event) => { event.preventDefault(); setEditingBudget(true); setBudgetMessage(""); }}
+                  onClick={editingBudget ? undefined : (event) => { event.preventDefault(); setDraftBudget(budget); setEditingBudget(true); setBudgetMessage(""); }}
                   disabled={budgetSaving}
                   className={cn("min-h-12 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition disabled:opacity-60", editingBudget ? "bg-[#31724a] text-white hover:bg-[#285f3e]" : "bg-[#202124] text-white hover:bg-[#34363a]")}
                 >
@@ -379,10 +382,14 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                     ] as const).map(([key, label]) => (
                       <label key={key} className="text-sm font-bold text-[#555a60]">
                         {label} (€)
-                        <input name={key} type="number" required min="0" max="9999999999.99" step="0.01" defaultValue={Number.isFinite(budget[key]) ? budget[key] : 0} disabled={budgetSaving} className="mt-2 h-14 w-full rounded-xl border-2 border-[#cfd3d6] px-4 text-xl font-extrabold tracking-tight outline-none focus:border-[#6f8173]" />
+                        <input name={key} type="number" required min="0" max="9999999999.99" step="0.01" value={Number.isFinite(draftBudget[key]) ? draftBudget[key] : 0} onChange={(event) => setDraftBudget((current) => ({ ...current, [key]: Number(event.target.value) }))} disabled={budgetSaving} className="mt-2 h-14 w-full rounded-xl border-2 border-[#cfd3d6] px-4 text-xl font-extrabold tracking-tight outline-none focus:border-[#6f8173]" />
                       </label>
                     ))}
                     <p className="rounded-lg bg-[#f4f5f7] px-3 py-3 text-xs text-[#686b70] sm:col-span-2">NLB raspoloživo se računa automatski: uneseno stanje minus 1.300 €.</p>
+                    <div className={cn("rounded-xl px-4 py-4 text-white sm:col-span-2", draftAvailableAfterPlans < 0 ? "bg-rose-700" : draftAvailableAfterPlans === 0 ? "bg-emerald-700" : "bg-blue-700")}>
+                      <p className="text-sm font-bold text-white/80">Slobodno nakon planova — pregled uživo</p>
+                      <p className="mt-1 text-2xl font-extrabold">{draftAvailableAfterPlans < 0 ? "−" : ""}{formatMoney(draftAvailableAfterPlans)} €</p>
+                    </div>
                   </form>
                   <div className="grid gap-3 border-t border-[#e7e8ea] pt-4 md:grid-cols-2">
                     <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onDelete={removePlannedItem} />
