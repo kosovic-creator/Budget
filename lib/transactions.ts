@@ -1,6 +1,7 @@
 export type TransactionCategory =
   | "Kućni troškovi"
   | "Lični troškovi"
+  | "Redovni troškovi"
   | "Plata"
   | "Ostalo";
 
@@ -8,6 +9,7 @@ export type TransactionType = "income" | "expense";
 export type DatabaseTransactionCategory =
   | "PERSONAL"
   | "HOUSEHOLD"
+  | "REGULAR"
   | "SALARY"
   | "OTHER";
 export type DatabaseTransactionType = "INCOME" | "EXPENSE";
@@ -43,6 +45,7 @@ export type CreateTransactionResult =
 
 const categoryLabels: Record<DatabaseTransactionCategory, TransactionCategory> = {
   HOUSEHOLD: "Kućni troškovi",
+  REGULAR: "Redovni troškovi",
   PERSONAL: "Lični troškovi",
   SALARY: "Plata",
   OTHER: "Ostalo",

@@ -10,6 +10,7 @@ import { serializeTransaction } from "@/lib/transactions";
 import type { PlannedItem } from "@/lib/planned-items";
 import type { RecurringItem } from "@/lib/recurring-items";
 import type { BankAccount } from "@/lib/bank";
+import { getBudgetCycle } from "@/lib/billing-cycle";
 
 export default function HomePage() {
   return (
@@ -58,11 +59,13 @@ async function loadDashboardData() {
       amount: Number(item.amount),
       kind: item.kind === "ADDITION" ? "addition" : "expectedExpense",
     }));
+    const currentCycle = getBudgetCycle();
     const recurringItems: RecurringItem[] = savedRecurringItems.map((item) => ({
       id: item.id,
       name: item.name,
       amount: Number(item.amount),
       kind: item.kind === "FIXED" ? "fixed" : "subscription",
+      paid: item.paidCycle === currentCycle,
     }));
     const bankAccounts: BankAccount[] = savedBankAccounts.map((account) => ({
       id: account.id,

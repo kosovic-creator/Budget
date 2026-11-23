@@ -45,6 +45,7 @@ function isTransactionCategory(value: FormDataEntryValue | null): value is Trans
   return (
     value === "Kućni troškovi" ||
     value === "Lični troškovi" ||
+    value === "Redovni troškovi" ||
     value === "Plata" ||
     value === "Ostalo"
   );
@@ -146,7 +147,9 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const nlbAvailable = budget.nlb - 1300;
   const additionsTotal = plannedItems.filter((item) => item.kind === "addition").reduce((sum, item) => sum + item.amount, 0);
   const expectedExpensesTotal = plannedItems.filter((item) => item.kind === "expectedExpense").reduce((sum, item) => sum + item.amount, 0);
-  const fixedExpensesTotal = recurringItems.filter((item) => item.kind === "fixed").reduce((sum, item) => sum + item.amount, 0);
+  const allFixedExpensesTotal = recurringItems.filter((item) => item.kind === "fixed").reduce((sum, item) => sum + item.amount, 0);
+  const fixedExpensesTotal = recurringItems.filter((item) => item.kind === "fixed" && !item.paid).reduce((sum, item) => sum + item.amount, 0);
+  const paidFixedExpensesTotal = allFixedExpensesTotal - fixedExpensesTotal;
   const subscriptionsTotal = recurringItems.filter((item) => item.kind === "subscription").reduce((sum, item) => sum + item.amount, 0);
   const monthlyExpensesTotal = fixedExpensesTotal + subscriptionsTotal;
   const transactionBalance = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
@@ -355,6 +358,13 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                   const spent = Math.abs(transactions.filter(item => item.type === "expense" && item.category === label).reduce((sum, item) => sum + item.amount, 0));
                   return <BudgetRow key={label} label={label} spent={spent} total={total} percent={total > 0 ? Math.min(100, spent / total * 100) : 0} color={color} />;
                 })}
+                <BudgetRow
+                  label="Redovni troškovi"
+                  spent={paidFixedExpensesTotal}
+                  total={allFixedExpensesTotal}
+                  percent={allFixedExpensesTotal > 0 ? Math.min(100, paidFixedExpensesTotal / allFixedExpensesTotal * 100) : 0}
+                  color="#4f7ca8"
+                />
                 {editingBudget && (
                   <>
                   <form id="budget-settings-form" onSubmit={submitBudget} className="grid gap-3 border-t border-[#e7e8ea] pt-4 sm:grid-cols-2">

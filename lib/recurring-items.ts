@@ -5,4 +5,5 @@ export interface RecurringItem {
   name: string;
   amount: number;
   kind: RecurringItemKind;
+  paid: boolean;
 }

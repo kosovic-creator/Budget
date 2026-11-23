@@ -16,6 +16,7 @@ enum TransactionType {
 enum Category {
   PERSONAL
   HOUSEHOLD
+  REGULAR
   SALARY
   OTHER
 }
@@ -57,6 +58,8 @@ model RecurringItem {
   name      String
   amount    Decimal           @db.Decimal(12, 2)
   kind      RecurringItemKind
+  paid      Boolean           @default(false)
+  paidCycle String?
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 

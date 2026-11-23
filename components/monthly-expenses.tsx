@@ -22,7 +22,7 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid }: 
   const [savingId, setSavingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const visibleItems = items.filter((item) => item.kind === view);
-  const fixedTotal = items.filter((item) => item.kind === "fixed").reduce((sum, item) => sum + item.amount, 0);
+  const fixedTotal = items.filter((item) => item.kind === "fixed" && !item.paid).reduce((sum, item) => sum + item.amount, 0);
   const subscriptionsTotal = items.filter((item) => item.kind === "subscription").reduce((sum, item) => sum + item.amount, 0);
 
   async function save(event: React.FormEvent<HTMLFormElement>, kind: RecurringItemKind, id?: string) {
@@ -54,6 +54,7 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid }: 
     const result = await payRecurringItem(item.id);
     if (result.success) {
       onPaid(result.transaction);
+      onItemsChange(items.map((entry) => entry.id === result.itemId ? { ...entry, paid: true } : entry));
       setMessage(`Trošak „${item.name}“ je evidentiran kao odliv.`);
     } else setMessage(result.message);
     setSavingId(null);
@@ -89,7 +90,7 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid }: 
               <label className="text-sm font-semibold text-zinc-700">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" step="0.01" defaultValue={item.amount} className="mt-2 h-12 w-full rounded-xl border border-zinc-200 px-3 text-[16px] font-bold outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:text-sm" /></label>
               <button disabled={savingId === item.id} className="h-12 rounded-xl border border-zinc-200 px-4 text-sm font-bold text-zinc-700 transition active:scale-[0.98] disabled:opacity-60">Sačuvaj</button>
               <div className="flex gap-2">
-                {view === "fixed" ? <button type="button" onClick={() => pay(item)} disabled={savingId === item.id} className="h-12 rounded-xl bg-zinc-900 px-4 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-60">Plati</button> : null}
+                {view === "fixed" ? <button type="button" onClick={() => pay(item)} disabled={savingId === item.id || item.paid} className="h-12 rounded-xl bg-zinc-900 px-4 text-sm font-bold text-white transition active:scale-[0.98] disabled:bg-emerald-50 disabled:text-emerald-700 disabled:opacity-100">{item.paid ? "Plaćeno" : "Plati"}</button> : null}
                 <button type="button" onClick={() => remove(item)} disabled={savingId === item.id} aria-label={`Ukloni ${item.name}`} className="grid h-12 w-12 place-items-center rounded-xl border border-zinc-200 text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-60"><Trash2 size={17} /></button>
               </div>
             </form>

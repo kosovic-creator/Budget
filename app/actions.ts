@@ -12,10 +12,12 @@ import type {
 import { serializeTransaction } from "@/lib/transactions";
 import type { PlannedItemKind } from "@/lib/planned-items";
 import type { RecurringItemKind } from "@/lib/recurring-items";
+import { getBudgetCycle } from "@/lib/billing-cycle";
 
 const categoryMap = {
   "Kućni troškovi": "HOUSEHOLD",
   "Lični troškovi": "PERSONAL",
+  "Redovni troškovi": "REGULAR",
   Plata: "SALARY",
   Ostalo: "OTHER",
 } satisfies Record<TransactionCategory, DatabaseTransactionCategory>;
@@ -147,7 +149,7 @@ export async function saveRecurringItem(input: { id?: string; name: string; amou
     const item = input.id
       ? await prisma.recurringItem.update({ where: { id: input.id }, data })
       : await prisma.recurringItem.create({ data });
-    return { success: true as const, item: { id: item.id, name: item.name, amount: Number(item.amount), kind: input.kind } };
+    return { success: true as const, item: { id: item.id, name: item.name, amount: Number(item.amount), kind: input.kind, paid: item.paidCycle === getBudgetCycle() } };
   } catch (error) {
     console.error("Neuspješno čuvanje mjesečne stavke.", error);
     return { success: false as const, message: "Stavka nije sačuvana." };
@@ -170,8 +172,13 @@ export async function payRecurringItem(id: string) {
   try {
     const item = await prisma.recurringItem.findUnique({ where: { id } });
     if (!item || item.kind !== "FIXED") return { success: false as const, message: "Fiksni trošak nije pronađen." };
-    const transaction = await prisma.transaction.create({ data: { title: item.name, amount: item.amount, type: "EXPENSE", category: "HOUSEHOLD" } });
-    return { success: true as const, transaction: serializeTransaction(transaction) };
+    const currentCycle = getBudgetCycle();
+    if (item.paidCycle === currentCycle) return { success: false as const, message: "Ovaj trošak je već plaćen u tekućem periodu." };
+    const [transaction] = await prisma.$transaction([
+      prisma.transaction.create({ data: { title: item.name, amount: item.amount, type: "EXPENSE", category: "REGULAR" } }),
+      prisma.recurringItem.update({ where: { id }, data: { paid: true, paidCycle: currentCycle } }),
+    ]);
+    return { success: true as const, itemId: item.id, transaction: serializeTransaction(transaction) };
   } catch (error) {
     console.error("Neuspješno evidentiranje plaćanja.", error);
     return { success: false as const, message: "Plaćanje nije evidentirano." };
