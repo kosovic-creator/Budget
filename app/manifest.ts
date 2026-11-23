@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Lični pregled stanja, troškova i pretplata.",
     start_url: "/",
     display: "standalone",
-    background_color: "#f4f5f7",
-    theme_color: "#202124",
+    background_color: "#f6f7f8",
+    theme_color: "#f6f7f8",
     orientation: "portrait-primary",
     icons: [
       {

@@ -80,16 +80,16 @@ async function loadDashboardData() {
 
 function DashboardFallback() {
   return (
-    <main className="min-h-screen bg-[#f4f5f7] px-4 py-5">
+    <main className="min-h-screen bg-[#f6f7f8] px-4 py-5">
       <div className="mx-auto max-w-[1440px] animate-pulse space-y-4">
         <div className="h-10 w-36 rounded-lg bg-white" />
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           {[0, 1, 2, 3].map((item) => (
-            <div key={item} className="h-28 rounded-xl bg-white" />
+            <div key={item} className="h-28 rounded-2xl bg-white shadow-[0_2px_12px_rgba(24,24,27,0.04)]" />
           ))}
         </div>
-        <div className="h-64 rounded-xl bg-white" />
-        <div className="h-56 rounded-xl bg-white" />
+        <div className="h-64 rounded-2xl bg-white shadow-[0_2px_12px_rgba(24,24,27,0.04)]" />
+        <div className="h-56 rounded-2xl bg-white shadow-[0_2px_12px_rgba(24,24,27,0.04)]" />
       </div>
     </main>
   );

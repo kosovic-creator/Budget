@@ -63,34 +63,34 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid }: 
 
   return (
     <section className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
-      <div className="rounded-xl border border-[#e7e8ea] bg-white p-4 md:p-6">
+      <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-[0_2px_12px_rgba(24,24,27,0.035)] md:p-6">
         <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between">
           <div>
-            <h2 className="text-xl font-bold">{title}</h2>
-            <p className="mt-1 text-sm text-[#85888d]">{view === "fixed" ? "Unesite redovne mjesečne obaveze i evidentirajte plaćanje." : "Unesite sve aktivne mjesečne pretplate."}</p>
+            <h2 className="text-xl font-bold tracking-tight text-zinc-900">{title}</h2>
+            <p className="mt-1 text-sm leading-6 text-zinc-500">{view === "fixed" ? "Unesite redovne mjesečne obaveze i evidentirajte plaćanje." : "Unesite sve aktivne mjesečne pretplate."}</p>
           </div>
-          <button type="button" onClick={() => setAdding((current) => !current)} className="flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-[#dfe1e3] px-3 text-sm font-bold min-[390px]:w-auto">
+          <button type="button" onClick={() => setAdding((current) => !current)} className="flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-zinc-200 px-4 text-sm font-bold text-zinc-800 transition active:scale-[0.98] min-[390px]:w-auto">
             <Plus size={16} /> {adding ? "Otkaži" : view === "fixed" ? "Dodaj trošak" : "Dodaj pretplatu"}
           </button>
         </div>
 
         {adding && (
-          <form onSubmit={(event) => save(event, view)} className="mt-5 grid gap-3 rounded-xl bg-[#f5f6f7] p-4 md:grid-cols-[1fr_220px_auto]">
-            <label className="text-sm font-semibold">Naziv<input name="name" required maxLength={100} className="mt-2 h-11 w-full rounded-lg border border-[#dfe1e3] bg-white px-3" /></label>
-            <label className="text-sm font-semibold">Iznos (€)<input name="amount" required type="number" min="0.01" max="9999999999.99" step="0.01" className="mt-2 h-11 w-full rounded-lg border border-[#dfe1e3] bg-white px-3" /></label>
-            <button disabled={savingId === "new"} className="h-11 self-end rounded-lg bg-[#202124] px-5 text-sm font-bold text-white disabled:opacity-60">Sačuvaj</button>
+          <form onSubmit={(event) => save(event, view)} className="mt-5 grid gap-3 rounded-2xl bg-zinc-50 p-4 md:grid-cols-[1fr_220px_auto]">
+            <label className="text-sm font-semibold text-zinc-700">Naziv<input name="name" required maxLength={100} className="mt-2 h-12 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:text-sm" /></label>
+            <label className="text-sm font-semibold text-zinc-700">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" max="9999999999.99" step="0.01" className="mt-2 h-12 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] font-bold outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:text-sm" /></label>
+            <button disabled={savingId === "new"} className="h-12 self-end rounded-xl bg-zinc-900 px-5 text-sm font-bold text-white shadow-lg shadow-zinc-900/10 transition active:scale-[0.98] disabled:opacity-60">Sačuvaj</button>
           </form>
         )}
 
         <div className="mt-5 space-y-3">
-          {visibleItems.length === 0 ? <p className="rounded-xl bg-[#f5f6f7] p-5 text-sm text-[#85888d]">Još nema unesenih stavki.</p> : visibleItems.map((item) => (
-            <form key={item.id} onSubmit={(event) => save(event, item.kind, item.id)} className="grid gap-3 rounded-xl border border-[#eceeef] p-3 md:grid-cols-[1fr_220px_auto_auto] md:items-end">
-              <label className="text-sm font-semibold">Naziv<input name="name" required defaultValue={item.name} className="mt-2 h-11 w-full rounded-lg border border-[#dfe1e3] px-3" /></label>
-              <label className="text-sm font-semibold">Iznos (€)<input name="amount" required type="number" min="0.01" step="0.01" defaultValue={item.amount} className="mt-2 h-11 w-full rounded-lg border border-[#dfe1e3] px-3" /></label>
-              <button disabled={savingId === item.id} className="h-11 rounded-lg border border-[#dfe1e3] px-4 text-sm font-bold disabled:opacity-60">Sačuvaj</button>
+          {visibleItems.length === 0 ? <p className="rounded-2xl bg-zinc-50 p-5 text-sm text-zinc-500">Još nema unesenih stavki.</p> : visibleItems.map((item) => (
+            <form key={item.id} onSubmit={(event) => save(event, item.kind, item.id)} className="grid gap-3 rounded-2xl border border-zinc-200/80 p-4 md:grid-cols-[1fr_220px_auto_auto] md:items-end">
+              <label className="text-sm font-semibold text-zinc-700">Naziv<input name="name" required defaultValue={item.name} className="mt-2 h-12 w-full rounded-xl border border-zinc-200 px-3 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:text-sm" /></label>
+              <label className="text-sm font-semibold text-zinc-700">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" step="0.01" defaultValue={item.amount} className="mt-2 h-12 w-full rounded-xl border border-zinc-200 px-3 text-[16px] font-bold outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:text-sm" /></label>
+              <button disabled={savingId === item.id} className="h-12 rounded-xl border border-zinc-200 px-4 text-sm font-bold text-zinc-700 transition active:scale-[0.98] disabled:opacity-60">Sačuvaj</button>
               <div className="flex gap-2">
-                {view === "fixed" ? <button type="button" onClick={() => pay(item)} disabled={savingId === item.id} className="h-11 rounded-lg bg-[#202124] px-4 text-sm font-bold text-white disabled:opacity-60">Plati</button> : null}
-                <button type="button" onClick={() => remove(item)} disabled={savingId === item.id} aria-label={`Ukloni ${item.name}`} className="grid h-11 w-11 place-items-center rounded-lg border border-[#dfe1e3] text-[#777b82] hover:text-red-600 disabled:opacity-60"><Trash2 size={17} /></button>
+                {view === "fixed" ? <button type="button" onClick={() => pay(item)} disabled={savingId === item.id} className="h-12 rounded-xl bg-zinc-900 px-4 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-60">Plati</button> : null}
+                <button type="button" onClick={() => remove(item)} disabled={savingId === item.id} aria-label={`Ukloni ${item.name}`} className="grid h-12 w-12 place-items-center rounded-xl border border-zinc-200 text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-60"><Trash2 size={17} /></button>
               </div>
             </form>
           ))}
@@ -107,5 +107,5 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid }: 
 }
 
 function Total({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-xl bg-[#f2f4f2] p-4"><p className="text-sm font-semibold text-[#686b70]">{label}</p><p className="mt-2 text-2xl font-bold">{formatMoney(value)} €</p></div>;
+  return <div className="rounded-2xl bg-emerald-50 p-4"><p className="text-sm font-semibold text-emerald-900/70">{label}</p><p className="mt-2 text-2xl font-bold tracking-tight text-emerald-950">{formatMoney(value)} €</p></div>;
 }
