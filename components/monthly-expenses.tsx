@@ -64,12 +64,12 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid }: 
   return (
     <section className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
       <div className="rounded-xl border border-[#e7e8ea] bg-white p-4 md:p-6">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between">
           <div>
             <h2 className="text-xl font-bold">{title}</h2>
             <p className="mt-1 text-sm text-[#85888d]">{view === "fixed" ? "Unesite redovne mjesečne obaveze i evidentirajte plaćanje." : "Unesite sve aktivne mjesečne pretplate."}</p>
           </div>
-          <button type="button" onClick={() => setAdding((current) => !current)} className="flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[#dfe1e3] px-3 text-sm font-bold">
+          <button type="button" onClick={() => setAdding((current) => !current)} className="flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-[#dfe1e3] px-3 text-sm font-bold min-[390px]:w-auto">
             <Plus size={16} /> {adding ? "Otkaži" : view === "fixed" ? "Dodaj trošak" : "Dodaj pretplatu"}
           </button>
         </div>

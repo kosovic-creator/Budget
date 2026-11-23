@@ -297,7 +297,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
       </aside>
 
       <main className="pb-[calc(82px+env(safe-area-inset-bottom))] lg:ml-[232px] lg:pb-0">
-        <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-[#e7e8ea] bg-white/95 px-4 backdrop-blur-md md:h-[76px] md:px-8 lg:static lg:px-10">
+        <header className="sticky top-0 z-20 flex min-h-[68px] items-center justify-between border-b border-[#e7e8ea] bg-white/95 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-md md:h-[76px] md:px-8 md:py-0 lg:static lg:px-10">
           <div>
             <p className="text-[11px] font-medium text-[#9a9da2] md:text-[12px]">Novembar 2026.</p>
             <h1 className="text-[18px] font-bold tracking-tight md:text-[20px]">{activeNav}</h1>
@@ -306,7 +306,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
             <button onClick={addPasskey} disabled={isAddingPasskey} aria-label="Dodaj ovaj uređaj za sigurnu prijavu" title="Zaštiti ovaj uređaj" className="grid h-10 w-10 place-items-center rounded-full border border-[#e6e7e9] text-[#6f7378] disabled:opacity-50">
               <Fingerprint size={18} />
             </button>
-            <button aria-label="Obavještenja" className="grid h-10 w-10 place-items-center rounded-full border border-[#e6e7e9] text-[#6f7378]">
+            <button aria-label="Obavještenja" className="hidden h-10 w-10 place-items-center rounded-full border border-[#e6e7e9] text-[#6f7378] min-[380px]:grid">
               <Bell size={17} />
             </button>
             <button
@@ -326,7 +326,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
 
         {activeNav === "Pregled" ? (
         <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
-          <section id="overview" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-3 2xl:grid-cols-6">
+          <section id="overview" className="grid grid-cols-1 gap-3 min-[430px]:grid-cols-2 md:gap-4 xl:grid-cols-3">
             <SummaryCard title="Ukupno stanje" value={`${totalBalance < 0 ? "−" : ""}${formatMoney(totalBalance)} €`} icon={<WalletCards size={18} />} tone="dark" trend="Nakon očekivanih troškova" />
             <SummaryCard title="OTP račun" value={`${formatMoney(budget.otp)} €`} icon={<Landmark size={18} />} trend="Stanje na računu" />
             <SummaryCard title="NLB račun" value={`${formatMoney(budget.nlb)} €`} icon={<Landmark size={18} />} trend="Ukupno na računu" />
@@ -452,7 +452,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
             )}
           >
             <item.icon size={19} strokeWidth={activeNav === item.label ? 2.2 : 1.8} />
-            {item.label}
+            {item.label === "Mjesečni troškovi" ? "Troškovi" : item.label}
           </button>
         ))}
       </nav>
@@ -586,9 +586,9 @@ function SummaryCard({ title, value, icon, tone, trend }: SummaryCardProps) {
         <p className={cn("text-[10px] font-semibold leading-tight sm:text-[12px]", tone === "dark" ? "text-[#c8cbd0]" : "text-[#85888d]")}>{title}</p>
         <div className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg sm:h-8 sm:w-8", tone === "dark" ? "bg-white/10 text-white" : "bg-[#f2f3f4] text-[#777b82]")}>{icon}</div>
       </div>
-      <div className="mt-3 flex items-end justify-between gap-1 sm:mt-5">
-        <p className="truncate text-[17px] font-bold tracking-tight sm:text-[23px]">{value}</p>
-        <span className={cn("mb-0.5 shrink-0 text-[9px] font-bold sm:mb-1 sm:text-[10px]", tone === "dark" ? "text-[#bfc9c1]" : "text-[#72917a]")}>{trend}</span>
+      <div className="mt-3 sm:mt-5">
+        <p className="whitespace-nowrap text-[17px] font-bold tracking-tight sm:text-[23px]">{value}</p>
+        <span className={cn("mt-1 block min-h-4 text-[9px] font-bold leading-tight sm:text-[10px]", tone === "dark" ? "text-[#bfc9c1]" : "text-[#72917a]")}>{trend}</span>
       </div>
     </div>
   );
