@@ -64,3 +64,16 @@ export async function createTransaction(
     };
   }
 }
+
+export async function saveBudget(input: import("@/lib/budget").BudgetSettings) {
+ const keys = ["household", "personal", "other", "cash"] as const;
+ if (!input || keys.some(key => typeof input[key] !== "number" || !Number.isFinite(input[key]) || input[key] < 0 || input[key] > 9_999_999_999.99)) return { success: false as const, message: "Unesite ispravne nenegativne iznose." };
+ const data = { household: input.household.toFixed(2), personal: input.personal.toFixed(2), other: input.other.toFixed(2), cash: input.cash.toFixed(2) };
+ try {
+ await prisma.budgetSettings.upsert({ where: { id: "default" }, create: { id: "default", ...data }, update: data });
+ return { success: true as const };
+ } catch (error) {
+ console.error("Neuspješno čuvanje plana i keša.", error);
+ return { success: false as const, message: "Podaci nijesu sačuvani. Pokušajte ponovo." };
+ }
+}

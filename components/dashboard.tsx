@@ -4,7 +4,6 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Bell,
-  ChevronDown,
   ChevronRight,
   CircleHelp,
   Home,
@@ -22,12 +21,14 @@ import {
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
-import { createTransaction } from "@/app/actions";
+import { createTransaction, saveBudget } from "@/app/actions";
 import type {
   NewTransaction,
   Transaction,
   TransactionCategory,
 } from "@/lib/transactions";
+
+import type { BudgetSettings } from "@/lib/budget";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return twMerge(clsx(classes));
@@ -51,9 +52,26 @@ function formatMoney(value: number) {
 
 interface DashboardProps {
   initialTransactions: Transaction[];
+  initialBudget: BudgetSettings;
 }
 
-export default function Dashboard({ initialTransactions }: DashboardProps) {
+export default function Dashboard({ initialTransactions, initialBudget }: DashboardProps) {
+  const [budget, setBudget] = useState(initialBudget);
+  const [editingBudget, setEditingBudget] = useState(false);
+  const [budgetSaving, setBudgetSaving] = useState(false);
+  const [budgetMessage, setBudgetMessage] = useState("");
+  async function submitBudget(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const next = { household: Number(form.get("household")), personal: Number(form.get("personal")), other: Number(form.get("other")), cash: Number(form.get("cash")) };
+    setBudgetSaving(true); setBudgetMessage("");
+    try {
+      const result = await saveBudget(next);
+      if (result.success) { setBudget(next); setEditingBudget(false); setBudgetMessage("Plan i keš su sačuvani."); }
+      else setBudgetMessage(result.message);
+    } catch { setBudgetMessage("Podaci nijesu sačuvani. Pokušajte ponovo."); }
+    finally { setBudgetSaving(false); }
+  }
   const [transactions, setTransactions] = useState(initialTransactions);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -198,58 +216,43 @@ export default function Dashboard({ initialTransactions }: DashboardProps) {
           <section id="overview" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
             <SummaryCard title="Ukupno stanje" value={`${formatMoney(income - expenses)} €`} icon={<WalletCards size={18} />} tone="dark" trend="+8.4%" />
             <SummaryCard title="Planirani prilivi" value={`${formatMoney(income)} €`} icon={<ArrowDownLeft size={18} />} trend="+12.1%" />
-            <SummaryCard title="Planirani troškovi" value={`${formatMoney(expenses)} €`} icon={<ArrowUpRight size={18} />} trend="-3.2%" />
-            <SummaryCard title="Keš" value={`${formatMoney(income - expenses)} €`} icon={<Landmark size={18} />} trend="+5.7%" />
+            <SummaryCard title="Planirani troškovi" value={`${formatMoney(budget.household + budget.personal + budget.other)} €`} icon={<ArrowUpRight size={18} />} trend="-3.2%" />
+            <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<Landmark size={18} />} trend="" onEdit={() => { setEditingBudget(true); setBudgetMessage(""); }} />
           </section>
 
-          <section className="mt-3 grid scroll-mt-20 gap-3 md:mt-4 md:gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(290px,.75fr)]">
-            <div id="reports" className="scroll-mt-20 rounded-xl border border-[#e7e8ea] bg-white p-4 md:p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-[12px] font-semibold text-[#777b82] md:text-[13px]">Novčani tok</p>
-                  <div className="mt-1 flex items-end gap-2">
-                    <h2 className="text-[21px] font-bold tracking-tight md:text-[26px]">{formatMoney(income - expenses)} €</h2>
-                    <span className="mb-1 rounded-full bg-[#edf5ef] px-2 py-1 text-[10px] font-bold text-[#4a8058]">+8.4%</span>
-                  </div>
-                </div>
-                <button className="flex h-8 items-center gap-1 rounded-lg border border-[#e5e6e8] px-2 text-[10px] font-semibold text-[#686b70] md:h-9 md:gap-2 md:px-3 md:text-[12px]">
-                  6 mjeseci <ChevronDown size={14} />
-                </button>
-              </div>
-
-              <div className="mt-4 h-[150px] sm:h-[190px] md:mt-6 md:h-[220px]">
-                <svg viewBox="0 0 700 220" className="h-full w-full overflow-visible" preserveAspectRatio="none" role="img" aria-label="Grafikon novčanog toka">
-                  {[35, 80, 125, 170].map((y) => (
-                    <line key={y} x1="0" y1={y} x2="700" y2={y} stroke="#edf0f2" strokeWidth="1" />
-                  ))}
-                  <defs>
-                    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a9b9ad" stopOpacity=".42" />
-                      <stop offset="100%" stopColor="#a9b9ad" stopOpacity=".02" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M0 168 C55 158 73 118 125 128 C175 138 198 92 245 102 C292 112 315 66 365 78 C420 92 448 120 492 92 C535 65 578 82 618 50 C650 24 674 34 700 25 L700 220 L0 220 Z" fill="url(#area)" />
-                  <path d="M0 168 C55 158 73 118 125 128 C175 138 198 92 245 102 C292 112 315 66 365 78 C420 92 448 120 492 92 C535 65 578 82 618 50 C650 24 674 34 700 25" fill="none" stroke="#667a6c" strokeWidth="3" strokeLinecap="round" />
-                  <circle cx="618" cy="50" r="5" fill="#fff" stroke="#667a6c" strokeWidth="3" />
-                </svg>
-              </div>
-              <div className="-mt-1 flex justify-between text-[10px] font-medium text-[#adb0b4]">
-                {["Jun", "Jul", "Avg", "Sep", "Okt", "Nov"].map((month) => <span key={month}>{month}</span>)}
-              </div>
-            </div>
-
+          <section className="mt-3 md:mt-4">
             <div id="plans" className="scroll-mt-20 rounded-xl border border-[#e7e8ea] bg-white p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[13px] font-semibold text-[#777b82]">Planirani troškovi</p>
-                  <p className="mt-1 text-[11px] text-[#a2a4a8]">Od ukupnog plana</p>
+                  <p className="mt-1 text-[11px] text-[#a2a4a8]">Potrošeno / planirani iznos</p>
                 </div>
-                <button className="grid h-8 w-8 place-items-center rounded-lg border border-[#e5e6e8] text-[#777b82]"><ChevronRight size={14} /></button>
+                <button onClick={() => { setEditingBudget(!editingBudget); setBudgetMessage(""); }} disabled={budgetSaving} className="rounded-lg border border-[#e5e6e8] px-3 py-2 text-xs font-semibold">{editingBudget ? "Otkaži" : "Uredi plan i keš"}</button>
               </div>
               <div className="mt-4 space-y-4 md:mt-5 md:space-y-5">
-                <BudgetRow label="Kućni troškovi" spent="1.420 €" total="2.000 €" percent={71} color="#7e927f" />
-                <BudgetRow label="Lični troškovi" spent="680 €" total="1.200 €" percent={57} color="#b9a578" />
-                <BudgetRow label="Ostalo" spent="340 €" total="800 €" percent={43} color="#8993a3" />
+                {([
+                  ["Kućni troškovi", budget.household, "#7e927f"],
+                  ["Lični troškovi", budget.personal, "#b9a578"],
+                  ["Ostalo", budget.other, "#8993a3"],
+                ] as const).map(([label, total, color]) => {
+                  const spent = Math.abs(transactions.filter(item => item.type === "expense" && item.category === label).reduce((sum, item) => sum + item.amount, 0));
+                  return <BudgetRow key={label} label={label} spent={formatMoney(spent) + " €"} total={formatMoney(total) + " €"} percent={total > 0 ? Math.min(100, spent / total * 100) : 0} color={color} />;
+                })}
+                {editingBudget && (
+                  <form onSubmit={submitBudget} className="grid gap-3 border-t border-[#e7e8ea] pt-4 sm:grid-cols-2">
+                    {([
+                      ["household", "Planirani kućni troškovi"], ["personal", "Planirani lični troškovi"],
+                      ["other", "Planirani ostali troškovi"], ["cash", "Keš"],
+                    ] as const).map(([key, label]) => (
+                      <label key={key} className="text-xs font-semibold text-[#686b70]">
+                        {label} (€)
+                        <input name={key} type="number" required min="0" max="9999999999.99" step="0.01" defaultValue={budget[key]} disabled={budgetSaving} className="mt-2 h-11 w-full rounded-lg border border-[#e2e4e6] px-3 text-sm" />
+                      </label>
+                    ))}
+                    <button disabled={budgetSaving} className="rounded-lg bg-[#202124] px-4 py-3 text-xs font-bold text-white disabled:opacity-60 sm:col-span-2">{budgetSaving ? "Čuvanje..." : "Sačuvaj plan i keš"}</button>
+                  </form>
+                )}
+                {budgetMessage && <p role="status" className="text-sm">{budgetMessage}</p>}
               </div>
             </div>
           </section>
@@ -299,7 +302,7 @@ export default function Dashboard({ initialTransactions }: DashboardProps) {
           { label: "Pregled", href: "#overview", icon: Home },
           { label: "Planovi", href: "#plans", icon: Target },
           { label: "Transakcije", href: "#transactions", icon: ReceiptText },
-          { label: "Izvještaji", href: "#reports", icon: TrendingUp },
+          { label: "Izvještaji", href: "#overview", icon: TrendingUp },
         ].map((item) => (
           <a
             key={item.label}
@@ -378,15 +381,17 @@ interface SummaryCardProps {
   icon: React.ReactNode;
   tone?: "dark";
   trend: string;
+  onEdit?: () => void;
 }
 
-function SummaryCard({ title, value, icon, tone, trend }: SummaryCardProps) {
+function SummaryCard({ title, value, icon, tone, trend, onEdit }: SummaryCardProps) {
   return (
     <div className={cn("min-h-[112px] min-w-0 rounded-xl border p-3.5 sm:min-h-[132px] sm:p-5", tone === "dark" ? "border-[#202124] bg-[#202124] text-white" : "border-[#e7e8ea] bg-white")}>
       <div className="flex items-center justify-between">
         <p className={cn("text-[10px] font-semibold leading-tight sm:text-[12px]", tone === "dark" ? "text-[#c8cbd0]" : "text-[#85888d]")}>{title}</p>
         <div className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg sm:h-8 sm:w-8", tone === "dark" ? "bg-white/10 text-white" : "bg-[#f2f3f4] text-[#777b82]")}>{icon}</div>
       </div>
+      {onEdit && <button onClick={onEdit} className="mt-2 text-xs font-semibold underline">Uredi keš</button>}
       <div className="mt-3 flex items-end justify-between gap-1 sm:mt-5">
         <p className="truncate text-[17px] font-bold tracking-tight sm:text-[23px]">{value}</p>
         <span className={cn("mb-0.5 shrink-0 text-[9px] font-bold sm:mb-1 sm:text-[10px]", tone === "dark" ? "text-[#bfc9c1]" : "text-[#72917a]")}>{trend}</span>

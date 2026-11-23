@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
+import { emptyBudget } from "@/lib/budget";
 import Dashboard from "@/components/dashboard";
 import { prisma } from "@/lib/prisma";
 import { serializeTransaction } from "@/lib/transactions";
@@ -20,7 +21,9 @@ async function DatabaseDashboard() {
       orderBy: { date: "desc" },
     });
 
-    return <Dashboard initialTransactions={records.map(serializeTransaction)} />;
+    const saved = await prisma.budgetSettings.findUnique({ where: { id: "default" } });
+    const budget = saved ? { household: Number(saved.household), personal: Number(saved.personal), other: Number(saved.other), cash: Number(saved.cash) } : emptyBudget;
+    return <Dashboard initialTransactions={records.map(serializeTransaction)} initialBudget={budget} />;
   } catch (error) {
     console.error("Neuspješno učitavanje transakcija iz Neon baze.", error);
     throw new Error("Transakcije trenutno nije moguće učitati iz baze.");
