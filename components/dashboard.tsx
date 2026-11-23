@@ -600,7 +600,7 @@ function SummaryCard({ title, value, icon, tone, trend, featured = false }: Summ
       tone === "dark" && "border-zinc-800 bg-zinc-900 text-white shadow-lg shadow-zinc-900/10",
       tone === "danger" && "border-rose-700 bg-rose-700 text-white shadow-lg shadow-rose-900/10",
       tone === "success" && "border-emerald-700 bg-emerald-700 text-white shadow-lg shadow-emerald-900/10",
-      tone === "info" && "border-emerald-700 bg-emerald-700 text-white shadow-lg shadow-emerald-900/10",
+      tone === "info" && "border-blue-700 bg-blue-700 text-white shadow-lg shadow-blue-900/10",
     )}>
       <div className="flex items-center justify-between">
         <p className={cn("text-[10px] font-semibold leading-tight sm:text-[12px]", colored ? "text-white/80" : "text-zinc-500")}>{title}</p>
