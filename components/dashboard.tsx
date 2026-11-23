@@ -5,14 +5,12 @@ import {
   ArrowUpRight,
   Bell,
   ChevronRight,
-  CircleHelp,
   Fingerprint,
   Home,
   Landmark,
   LayoutGrid,
   Plus,
   Search,
-  Settings,
   Target,
   WalletCards,
   LogOut,
@@ -275,14 +273,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         </nav>
 
         <div className="px-4 pb-5">
-          <div className="mb-2 space-y-1">
-            <button className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[14px] font-medium text-zinc-500 transition hover:bg-zinc-50">
-              <CircleHelp size={18} strokeWidth={1.8} /> Pomoć
-            </button>
-            <button className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[14px] font-medium text-zinc-500 transition hover:bg-zinc-50">
-              <Settings size={18} strokeWidth={1.8} /> Podešavanja
-            </button>
-          </div>
           <div className="mt-4 flex items-center gap-3 border-t border-zinc-100 px-2 pt-5">
             <div className="grid h-9 w-9 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-900">{userInitials}</div>
             <div className="min-w-0">
