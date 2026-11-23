@@ -80,11 +80,11 @@ export default function Dashboard({ initialTransactions, initialBudget, userName
     }
 
     const result = await authClient.passkey.addPasskey({
-      name: "iPhone Face ID",
+      name: /iPhone|iPad|iPod/i.test(navigator.userAgent) ? "iPhone Face ID" : "Passkey ovog uređaja",
       authenticatorAttachment: "platform",
     });
 
-    setSecurityMessage(result.error ? (result.error.message ?? "Face ID nije dodat.") : "Face ID/passkey je uspješno dodat.");
+    setSecurityMessage(result.error ? (result.error.message ?? "Zaštita uređaja nije dodata.") : "Ovaj uređaj je uspješno dodat za sigurnu prijavu.");
     setIsAddingPasskey(false);
   }
 
@@ -235,7 +235,7 @@ export default function Dashboard({ initialTransactions, initialBudget, userName
             <h1 className="text-[18px] font-bold tracking-tight md:text-[20px]">Pregled</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={addPasskey} disabled={isAddingPasskey} aria-label="Dodaj Face ID ili passkey" title="Dodaj Face ID" className="grid h-10 w-10 place-items-center rounded-full border border-[#e6e7e9] text-[#6f7378] disabled:opacity-50">
+            <button onClick={addPasskey} disabled={isAddingPasskey} aria-label="Dodaj ovaj uređaj za sigurnu prijavu" title="Zaštiti ovaj uređaj" className="grid h-10 w-10 place-items-center rounded-full border border-[#e6e7e9] text-[#6f7378] disabled:opacity-50">
               <Fingerprint size={18} />
             </button>
             <button aria-label="Obavještenja" className="grid h-10 w-10 place-items-center rounded-full border border-[#e6e7e9] text-[#6f7378]">

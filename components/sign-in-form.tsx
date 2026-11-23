@@ -21,6 +21,12 @@ export default function SignInForm({ setupRequired }: SignInFormProps) {
   const [isPending, setIsPending] = useState(false);
   const [message, setMessage] = useState("");
 
+  function passkeyName() {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent)
+      ? "iPhone Face ID"
+      : "Passkey ovog uređaja";
+  }
+
   async function registerPasskey() {
     setIsPending(true);
     setMessage("");
@@ -32,12 +38,12 @@ export default function SignInForm({ setupRequired }: SignInFormProps) {
     }
 
     const result = await authClient.passkey.addPasskey({
-      name: "iPhone Face ID",
+      name: passkeyName(),
       authenticatorAttachment: "platform",
     });
 
     if (result.error) {
-      setMessage(`Nalog je sačuvan, ali Face ID nije dodat: ${errorMessage(result.error)}`);
+      setMessage(`Nalog je sačuvan, ali zaštita ovog uređaja nije dodata: ${errorMessage(result.error)}`);
       setIsPending(false);
       return;
     }
@@ -108,8 +114,8 @@ export default function SignInForm({ setupRequired }: SignInFormProps) {
       return;
     }
 
-    router.replace("/");
-    router.refresh();
+    setMessage("Prijava je uspjela. Potvrdite naredni prozor da uključite Face ID na ovom iPhoneu.");
+    await registerPasskey();
   }
 
   return (
@@ -124,8 +130,8 @@ export default function SignInForm({ setupRequired }: SignInFormProps) {
         </h1>
         <p className="mt-2 text-sm leading-6 text-[#777b82]">
           {setupRequired
-            ? "Napravite vlasnički nalog, a zatim registrujte Face ID na iPhoneu ili passkey na ovom uređaju."
-            : "Otključajte budžet Face ID-em, otiskom prsta ili šifrom uređaja."}
+            ? "Napravite vlasnički nalog, a zatim zaštitite uređaj Face ID-em, otiskom prsta ili šifrom uređaja."
+            : "Na novom iPhoneu se prvo prijavite rezervnom lozinkom. Aplikacija će zatim uključiti Face ID za naredne prijave."}
         </p>
 
         {setupRequired && !accountCreated ? (
@@ -134,20 +140,20 @@ export default function SignInForm({ setupRequired }: SignInFormProps) {
             <AuthField label="Email" name="email" type="email" autoComplete="email" placeholder="ime@primjer.com" />
             <AuthField label="Rezervna lozinka" name="password" type="password" autoComplete="new-password" minLength={10} placeholder="Najmanje 10 znakova" />
             <button disabled={isPending} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202124] text-sm font-bold text-white disabled:opacity-60">
-              <ShieldCheck size={18} /> {isPending ? "Podešavanje..." : "Napravi nalog i dodaj Face ID"}
+              <ShieldCheck size={18} /> {isPending ? "Podešavanje..." : "Napravi nalog i zaštiti uređaj"}
             </button>
           </form>
         ) : setupRequired && accountCreated ? (
           <div className="mt-6 space-y-3">
             <button onClick={registerPasskey} disabled={isPending} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202124] text-sm font-bold text-white disabled:opacity-60">
-              <Fingerprint size={20} /> {isPending ? "Čekanje potvrde..." : "Pokušaj ponovo dodati Face ID"}
+              <Fingerprint size={20} /> {isPending ? "Čekanje potvrde..." : "Pokušaj ponovo zaštititi ovaj uređaj"}
             </button>
             <Link href="/" className="flex h-11 items-center justify-center text-sm font-semibold text-[#686b70]">Nastavi i podesi kasnije</Link>
           </div>
         ) : (
           <div className="mt-6">
             <button onClick={signInWithPasskey} disabled={isPending} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202124] text-sm font-bold text-white disabled:opacity-60">
-              <Fingerprint size={21} /> {isPending ? "Čekanje potvrde..." : "Otključaj Face ID-em"}
+              <Fingerprint size={21} /> {isPending ? "Čekanje potvrde..." : "Otključaj Face ID-em ili passkey-em"}
             </button>
 
             <button onClick={() => { setShowRecovery(!showRecovery); setMessage(""); }} className="mt-3 flex h-10 w-full items-center justify-center gap-2 text-xs font-semibold text-[#777b82]">
@@ -159,7 +165,7 @@ export default function SignInForm({ setupRequired }: SignInFormProps) {
                 <AuthField label="Email" name="email" type="email" autoComplete="username webauthn" placeholder="ime@primjer.com" />
                 <AuthField label="Lozinka" name="password" type="password" autoComplete="current-password webauthn" placeholder="Vaša rezervna lozinka" />
                 <button disabled={isPending} className="h-11 w-full rounded-xl border border-[#dfe1e3] text-sm font-bold disabled:opacity-60">
-                  Prijavi se lozinkom
+                  Prijavi se i uključi Face ID
                 </button>
               </form>
             )}
@@ -167,7 +173,7 @@ export default function SignInForm({ setupRequired }: SignInFormProps) {
         )}
 
         {message && <p role="alert" className="mt-4 rounded-xl bg-[#f7eeee] px-4 py-3 text-sm text-[#9b3d3d]">{message}</p>}
-        <p className="mt-6 text-xs leading-5 text-[#9a9da2]">Face ID ostaje na vašem iPhoneu. Aplikacija dobija samo sigurnu potvrdu identiteta.</p>
+        <p className="mt-6 text-xs leading-5 text-[#9a9da2]">Face ID ostaje na vašem iPhoneu. Za novi uređaj potrebna je jednokratna prijava rezervnom lozinkom.</p>
       </div>
     </main>
   );
