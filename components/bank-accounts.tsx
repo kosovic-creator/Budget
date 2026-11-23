@@ -110,7 +110,7 @@ export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
             );
           })}
         </div>
-        <div className="mt-5 flex items-center justify-between rounded-2xl bg-zinc-900 px-4 py-4 text-white shadow-lg shadow-zinc-900/10"><span className="font-semibold">Nakon odbitaka + dodatne stavke</span><strong className="text-xl">{money(total)} €</strong></div>
+        <div className="mt-5 flex items-center justify-between rounded-2xl bg-zinc-900 px-4 py-4 text-white shadow-lg shadow-zinc-900/10"><span className="font-semibold">Ukupno</span><strong className="text-xl">{money(total)} €</strong></div>
         <button type="button" onClick={() => setAdding((value) => !value)} className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 px-3 text-sm font-bold text-zinc-800 transition active:scale-[0.98] min-[390px]:w-auto"><Plus size={16} /> {adding ? "Otkaži" : "Dodaj stavku"}</button>
         {adding ? <AccountForm onSubmit={(event) => saveAccount(event)} busy={busy === "new"} /> : null}
         {message ? <p role="status" className="mt-4 text-sm font-medium text-[#66816d]">{message}</p> : null}
