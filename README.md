@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Finanse
 
-## Getting Started
+Mobilno prilagođen Next.js pregled ličnih finansija. Transakcije se čuvaju u PostgreSQL bazi na Neon-u preko Prisma ORM-a.
 
-First, run the development server:
+## Pokretanje
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Instalirajte zavisnosti:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+   ```bash
+   npm install
+   ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+2. Napravite `.env` kopiranjem `.env.example` i unesite Neon konekcione stringove:
+   - `DATABASE_URL` za aplikaciju (preporučeno pooled URL)
+   - `DIRECT_URL` je opcionalan; koristi se za Prisma DB komande
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Generišite Prisma Client i uskladite tabelu sa šemom:
 
-## Learn More
+   ```bash
+   npm run db:generate
+   npm run db:push
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+4. Pokrenite aplikaciju:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   ```bash
+   npm run dev
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Otvorite [http://localhost:3000](http://localhost:3000).
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`npm run build` automatski generiše Prisma Client prije produkcijskog builda.

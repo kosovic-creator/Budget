@@ -2,14 +2,23 @@
   "name": "budget-app",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
+    "predev": "prisma generate",
     "dev": "next dev",
+    "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.1",
+    "@prisma/adapter-neon": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "clsx": "^2.1.1",
+    "dotenv": "^18.0.10",
     "lucide-react": "^1.77.0",
     "next": "16.4.6",
     "react": "19.3.0",
@@ -23,7 +32,11 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "prisma": "^7.10.1",
     "tailwindcss": "4.3.3",
     "typescript": "^5"
+  },
+  "overrides": {
+    "effect": "3.22.5"
   }
 }
