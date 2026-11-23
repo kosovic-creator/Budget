@@ -63,7 +63,12 @@ export default function Dashboard({ initialTransactions, initialBudget }: Dashbo
   async function submitBudget(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const next = { household: Number(form.get("household")), personal: Number(form.get("personal")), other: Number(form.get("other")), cash: Number(form.get("cash")) };
+    const next = {
+      household: Number(form.get("household")),
+      personal: Number(form.get("personal")),
+      other: 0,
+      cash: Number(form.get("cash")),
+    };
     setBudgetSaving(true); setBudgetMessage("");
     try {
       const result = await saveBudget(next);
@@ -216,7 +221,7 @@ export default function Dashboard({ initialTransactions, initialBudget }: Dashbo
           <section id="overview" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
             <SummaryCard title="Ukupno stanje" value={`${formatMoney(income - expenses)} €`} icon={<WalletCards size={18} />} tone="dark" trend="+8.4%" />
             <SummaryCard title="Planirani prilivi" value={`${formatMoney(income)} €`} icon={<ArrowDownLeft size={18} />} trend="+12.1%" />
-            <SummaryCard title="Planirani troškovi" value={`${formatMoney(budget.household + budget.personal + budget.other)} €`} icon={<ArrowUpRight size={18} />} trend="-3.2%" />
+            <SummaryCard title="Ukupan mjesečni plan" value={`${formatMoney(budget.household + budget.personal)} €`} icon={<ArrowUpRight size={18} />} trend="Kućni + lični" />
             <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<Landmark size={18} />} trend="" onEdit={() => { setEditingBudget(true); setBudgetMessage(""); }} />
           </section>
 
@@ -224,8 +229,8 @@ export default function Dashboard({ initialTransactions, initialBudget }: Dashbo
             <div id="plans" className="scroll-mt-20 rounded-xl border border-[#e7e8ea] bg-white p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[13px] font-semibold text-[#777b82]">Planirani troškovi</p>
-                  <p className="mt-1 text-[11px] text-[#a2a4a8]">Potrošeno / planirani iznos</p>
+                  <p className="text-[13px] font-semibold text-[#777b82]">Mjesečni limiti troškova</p>
+                  <p className="mt-1 text-[11px] text-[#a2a4a8]">Za svaku kategoriju vidiš potrošeno, limit i preostali iznos.</p>
                 </div>
                 <button onClick={() => { setEditingBudget(!editingBudget); setBudgetMessage(""); }} disabled={budgetSaving} className="rounded-lg border border-[#e5e6e8] px-3 py-2 text-xs font-semibold">{editingBudget ? "Otkaži" : "Uredi plan i keš"}</button>
               </div>
@@ -233,16 +238,16 @@ export default function Dashboard({ initialTransactions, initialBudget }: Dashbo
                 {([
                   ["Kućni troškovi", budget.household, "#7e927f"],
                   ["Lični troškovi", budget.personal, "#b9a578"],
-                  ["Ostalo", budget.other, "#8993a3"],
                 ] as const).map(([label, total, color]) => {
                   const spent = Math.abs(transactions.filter(item => item.type === "expense" && item.category === label).reduce((sum, item) => sum + item.amount, 0));
-                  return <BudgetRow key={label} label={label} spent={formatMoney(spent) + " €"} total={formatMoney(total) + " €"} percent={total > 0 ? Math.min(100, spent / total * 100) : 0} color={color} />;
+                  return <BudgetRow key={label} label={label} spent={spent} total={total} percent={total > 0 ? Math.min(100, spent / total * 100) : 0} color={color} />;
                 })}
                 {editingBudget && (
                   <form onSubmit={submitBudget} className="grid gap-3 border-t border-[#e7e8ea] pt-4 sm:grid-cols-2">
                     {([
-                      ["household", "Planirani kućni troškovi"], ["personal", "Planirani lični troškovi"],
-                      ["other", "Planirani ostali troškovi"], ["cash", "Keš"],
+                      ["household", "Mjesečni limit za kućne troškove"],
+                      ["personal", "Mjesečni limit za lične troškove"],
+                      ["cash", "Trenutni iznos keša"],
                     ] as const).map(([key, label]) => (
                       <label key={key} className="text-xs font-semibold text-[#686b70]">
                         {label} (€)
@@ -402,18 +407,28 @@ function SummaryCard({ title, value, icon, tone, trend, onEdit }: SummaryCardPro
 
 interface BudgetRowProps {
   label: string;
-  spent: string;
-  total: string;
+  spent: number;
+  total: number;
   percent: number;
   color: string;
 }
 
 function BudgetRow({ label, spent, total, percent, color }: BudgetRowProps) {
+  const remaining = Math.max(0, total - spent);
+  const exceeded = Math.max(0, spent - total);
+
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <p className="text-[12px] font-semibold">{label}</p>
-        <p className="text-[11px] text-[#9a9da1]"><span className="font-bold text-[#4d5054]">{spent}</span> / {total}</p>
+        <div className="text-right text-[11px]">
+          <p><span className="text-[#9a9da1]">Potrošeno:</span> <span className="font-bold text-[#4d5054]">{formatMoney(spent)} €</span> <span className="text-[#9a9da1]">od {formatMoney(total)} €</span></p>
+          {exceeded > 0 ? (
+            <p className="mt-0.5 font-semibold text-red-600">Limit prekoračen za {formatMoney(exceeded)} €</p>
+          ) : (
+            <p className="mt-0.5 font-semibold text-[#66816d]">Preostalo: {formatMoney(remaining)} €</p>
+          )}
+        </div>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-[#eff1f2]">
         <div className="h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: color }} />
