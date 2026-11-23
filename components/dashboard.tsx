@@ -252,7 +252,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
             <div className="grid h-10 w-10 place-items-center rounded-2xl bg-zinc-900 text-white shadow-lg shadow-zinc-900/15">
               <WalletCards size={18} strokeWidth={2.2} />
             </div>
-            <span className="text-[19px] font-bold tracking-tight text-zinc-900">Finanse</span>
+            <span className="text-[19px] font-bold tracking-tight text-zinc-900">Stanje</span>
           </div>
         </div>
 

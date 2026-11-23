@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Finanse | Pregled budžeta",
+  title: "Stanje | Pregled budžeta",
   description: "Pregled priliva, odliva i planiranih troškova",
   applicationName: "Moj budžet",
   appleWebApp: {

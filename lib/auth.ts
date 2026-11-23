@@ -12,7 +12,7 @@ if (process.env.NODE_ENV === "production" && !secret) {
 }
 
 export const auth = betterAuth({
-  appName: "Finanse",
+  appName: "Stanje",
   secret: secret ?? "finanse-local-development-secret-change-before-deploy",
   baseURL: process.env.BETTER_AUTH_URL,
   database: prismaAdapter(prisma, { provider: "postgresql" }),
@@ -42,7 +42,7 @@ export const auth = betterAuth({
   },
   plugins: [
     passkey({
-      rpName: "Finanse",
+      rpName: "Stanje",
       authenticatorSelection: {
         residentKey: "required",
         userVerification: "required",
