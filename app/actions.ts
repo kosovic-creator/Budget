@@ -1,6 +1,8 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 import type {
   CreateTransactionResult,
   DatabaseTransactionCategory,
@@ -19,6 +21,10 @@ const categoryMap = {
 export async function createTransaction(
   input: NewTransaction,
 ): Promise<CreateTransactionResult> {
+  if (!(await auth.api.getSession({ headers: await headers() }))) {
+    return { success: false, message: "Sesija je istekla. Prijavite se ponovo." };
+  }
+
   if (!input || typeof input.title !== "string") {
     return {
       success: false,
@@ -66,6 +72,9 @@ export async function createTransaction(
 }
 
 export async function saveBudget(input: import("@/lib/budget").BudgetSettings) {
+ if (!(await auth.api.getSession({ headers: await headers() }))) {
+  return { success: false as const, message: "Sesija je istekla. Prijavite se ponovo." };
+ }
  const keys = ["household", "personal", "other", "cash"] as const;
  if (!input || keys.some(key => typeof input[key] !== "number" || !Number.isFinite(input[key]) || input[key] < 0 || input[key] > 9_999_999_999.99)) return { success: false as const, message: "Unesite ispravne nenegativne iznose." };
  const data = { household: input.household.toFixed(2), personal: input.personal.toFixed(2), other: input.other.toFixed(2), cash: input.cash.toFixed(2) };

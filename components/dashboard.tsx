@@ -6,6 +6,7 @@ import {
   Bell,
   ChevronRight,
   CircleHelp,
+  Fingerprint,
   Home,
   Landmark,
   LayoutGrid,
@@ -16,9 +17,11 @@ import {
   Target,
   TrendingUp,
   WalletCards,
+  LogOut,
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
 import { createTransaction, saveBudget } from "@/app/actions";
@@ -29,6 +32,7 @@ import type {
 } from "@/lib/transactions";
 
 import type { BudgetSettings } from "@/lib/budget";
+import { authClient } from "@/lib/auth-client";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return twMerge(clsx(classes));
@@ -53,13 +57,37 @@ function formatMoney(value: number) {
 interface DashboardProps {
   initialTransactions: Transaction[];
   initialBudget: BudgetSettings;
+  userName: string;
 }
 
-export default function Dashboard({ initialTransactions, initialBudget }: DashboardProps) {
+export default function Dashboard({ initialTransactions, initialBudget, userName }: DashboardProps) {
+  const router = useRouter();
   const [budget, setBudget] = useState(initialBudget);
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetSaving, setBudgetSaving] = useState(false);
   const [budgetMessage, setBudgetMessage] = useState("");
+  const [securityMessage, setSecurityMessage] = useState("");
+  const [isAddingPasskey, setIsAddingPasskey] = useState(false);
+
+  async function addPasskey() {
+    setIsAddingPasskey(true);
+    setSecurityMessage("");
+
+    if (!("PublicKeyCredential" in window)) {
+      setSecurityMessage("Ovaj preglednik ne podržava Face ID/passkey.");
+      setIsAddingPasskey(false);
+      return;
+    }
+
+    const result = await authClient.passkey.addPasskey({
+      name: "iPhone Face ID",
+      authenticatorAttachment: "platform",
+    });
+
+    setSecurityMessage(result.error ? (result.error.message ?? "Face ID nije dodat.") : "Face ID/passkey je uspješno dodat.");
+    setIsAddingPasskey(false);
+  }
+
   async function submitBudget(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -190,8 +218,10 @@ export default function Dashboard({ initialTransactions, initialBudget }: Dashbo
           <div className="mt-4 flex items-center gap-3 border-t border-[#eff0f1] px-2 pt-5">
             <div className="grid h-9 w-9 place-items-center rounded-full bg-[#dfe5df] text-xs font-bold">MA</div>
             <div className="min-w-0">
-              <p className="truncate text-[13px] font-semibold">Marko Anić</p>
-              <p className="truncate text-[11px] text-[#9b9da1]">marko@example.com</p>
+              <p className="truncate text-[13px] font-semibold">{userName}</p>
+              <button onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => { router.replace("/sign-in"); router.refresh(); } } })} className="mt-0.5 flex items-center gap-1 text-[11px] text-[#9b9da1] hover:text-[#555]">
+                <LogOut size={11} /> Odjavi se
+              </button>
             </div>
             <ChevronRight size={16} className="ml-auto text-[#aaa]" />
           </div>
@@ -205,6 +235,9 @@ export default function Dashboard({ initialTransactions, initialBudget }: Dashbo
             <h1 className="text-[18px] font-bold tracking-tight md:text-[20px]">Pregled</h1>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={addPasskey} disabled={isAddingPasskey} aria-label="Dodaj Face ID ili passkey" title="Dodaj Face ID" className="grid h-10 w-10 place-items-center rounded-full border border-[#e6e7e9] text-[#6f7378] disabled:opacity-50">
+              <Fingerprint size={18} />
+            </button>
             <button aria-label="Obavještenja" className="grid h-10 w-10 place-items-center rounded-full border border-[#e6e7e9] text-[#6f7378]">
               <Bell size={17} />
             </button>
@@ -216,6 +249,12 @@ export default function Dashboard({ initialTransactions, initialBudget }: Dashbo
             </button>
           </div>
         </header>
+
+        {securityMessage && (
+          <div role="status" className="fixed right-4 top-20 z-40 max-w-xs rounded-xl bg-[#202124] px-4 py-3 text-sm font-medium text-white shadow-lg md:right-8">
+            {securityMessage}
+          </div>
+        )}
 
         <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
           <section id="overview" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">

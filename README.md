@@ -30,3 +30,18 @@ Mobilno prilagođen Next.js pregled ličnih finansija. Transakcije se čuvaju u 
 Otvorite [http://localhost:3000](http://localhost:3000).
 
 `npm run build` automatski generiše Prisma Client prije produkcijskog builda.
+
+## Face ID i passkey prijava
+
+Pri prvom otvaranju aplikacija traži da napravite jedini vlasnički nalog. Nakon kreiranja naloga preglednik nudi registraciju passkey-a. Na iPhoneu se taj passkey potvrđuje Face ID-em.
+
+Za lokalni razvoj dodajte u `.env`:
+
+```env
+BETTER_AUTH_SECRET="nasumični-secret-od-najmanje-32-znaka"
+BETTER_AUTH_URL="http://localhost:3000"
+```
+
+Za iPhone je potrebna javna HTTPS adresa. U produkcijskom okruženju postavite zaseban `BETTER_AUTH_SECRET` i podesite `BETTER_AUTH_URL` na konačni domen, na primjer `https://finanse.example.com`. Secret se ne smije izlagati kroz `NEXT_PUBLIC_` varijablu.
+
+Ako Face ID/passkey nije dostupan, vlasnik se može prijaviti rezervnom lozinkom koju unosi prilikom prvog podešavanja.

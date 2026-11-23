@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { emptyBudget } from "@/lib/budget";
 import Dashboard from "@/components/dashboard";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serializeTransaction } from "@/lib/transactions";
 
@@ -16,14 +19,21 @@ export default function HomePage() {
 async function DatabaseDashboard() {
   await connection();
 
-  try {
-    const records = await prisma.transaction.findMany({
-      orderBy: { date: "desc" },
-    });
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/sign-in");
 
-    const saved = await prisma.budgetSettings.findUnique({ where: { id: "default" } });
+  const { transactions, budget } = await loadDashboardData();
+  return <Dashboard initialTransactions={transactions} initialBudget={budget} userName={session.user.name} />;
+}
+
+async function loadDashboardData() {
+  try {
+    const [records, saved] = await Promise.all([
+      prisma.transaction.findMany({ orderBy: { date: "desc" } }),
+      prisma.budgetSettings.findUnique({ where: { id: "default" } }),
+    ]);
     const budget = saved ? { household: Number(saved.household), personal: Number(saved.personal), other: Number(saved.other), cash: Number(saved.cash) } : emptyBudget;
-    return <Dashboard initialTransactions={records.map(serializeTransaction)} initialBudget={budget} />;
+    return { transactions: records.map(serializeTransaction), budget };
   } catch (error) {
     console.error("Neuspješno učitavanje transakcija iz Neon baze.", error);
     throw new Error("Transakcije trenutno nije moguće učitati iz baze.");
