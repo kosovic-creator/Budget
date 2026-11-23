@@ -171,7 +171,7 @@ export async function payRecurringItem(id: string) {
   if (!(await auth.api.getSession({ headers: await headers() }))) return { success: false as const, message: "Sesija je istekla." };
   try {
     const item = await prisma.recurringItem.findUnique({ where: { id } });
-    if (!item || item.kind !== "FIXED") return { success: false as const, message: "Fiksni trošak nije pronađen." };
+    if (!item) return { success: false as const, message: "Mjesečna stavka nije pronađena." };
     const currentCycle = getBudgetCycle();
     if (item.paidCycle === currentCycle) return { success: false as const, message: "Ovaj trošak je već plaćen u tekućem periodu." };
     const [transaction] = await prisma.$transaction([

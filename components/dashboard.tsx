@@ -148,9 +148,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const additionsTotal = plannedItems.filter((item) => item.kind === "addition").reduce((sum, item) => sum + item.amount, 0);
   const expectedExpensesTotal = plannedItems.filter((item) => item.kind === "expectedExpense").reduce((sum, item) => sum + item.amount, 0);
   const allFixedExpensesTotal = recurringItems.filter((item) => item.kind === "fixed").reduce((sum, item) => sum + item.amount, 0);
+  const allSubscriptionsTotal = recurringItems.filter((item) => item.kind === "subscription").reduce((sum, item) => sum + item.amount, 0);
   const fixedExpensesTotal = recurringItems.filter((item) => item.kind === "fixed" && !item.paid).reduce((sum, item) => sum + item.amount, 0);
-  const paidFixedExpensesTotal = allFixedExpensesTotal - fixedExpensesTotal;
-  const subscriptionsTotal = recurringItems.filter((item) => item.kind === "subscription").reduce((sum, item) => sum + item.amount, 0);
+  const subscriptionsTotal = recurringItems.filter((item) => item.kind === "subscription" && !item.paid).reduce((sum, item) => sum + item.amount, 0);
+  const allRegularExpensesTotal = allFixedExpensesTotal + allSubscriptionsTotal;
+  const paidRegularExpensesTotal = allRegularExpensesTotal - fixedExpensesTotal - subscriptionsTotal;
   const monthlyExpensesTotal = fixedExpensesTotal + subscriptionsTotal;
   const transactionBalance = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
   const totalBalance = budget.otp + nlbAvailable + budget.cash + additionsTotal - expectedExpensesTotal + transactionBalance;
@@ -360,9 +362,9 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                 })}
                 <BudgetRow
                   label="Redovni troškovi"
-                  spent={paidFixedExpensesTotal}
-                  total={allFixedExpensesTotal}
-                  percent={allFixedExpensesTotal > 0 ? Math.min(100, paidFixedExpensesTotal / allFixedExpensesTotal * 100) : 0}
+                  spent={paidRegularExpensesTotal}
+                  total={allRegularExpensesTotal}
+                  percent={allRegularExpensesTotal > 0 ? Math.min(100, paidRegularExpensesTotal / allRegularExpensesTotal * 100) : 0}
                   color="#4f7ca8"
                 />
                 {editingBudget && (
