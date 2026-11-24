@@ -162,6 +162,25 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [newTransactionType, setNewTransactionType] = useState<"income" | "expense">("expense");
+  const [transactionTitle, setTransactionTitle] = useState("");
+  const [titleSuggestionsOpen, setTitleSuggestionsOpen] = useState(false);
+  const titleSuggestions = useMemo(() => {
+    const query = transactionTitle.trim().toLocaleLowerCase();
+    const seen = new Set<string>();
+    const suggestions: string[] = [];
+    const recentTitles = transactions
+      .filter((item) => item.type === "expense" && item.title !== item.category)
+      .map((item) => item.title);
+
+    for (const title of [...recentTitles, "Ostalo"]) {
+      const normalized = title.trim().toLocaleLowerCase();
+      if (!normalized || !normalized.startsWith(query) || normalized === query || seen.has(normalized)) continue;
+      suggestions.push(title);
+      seen.add(normalized);
+      if (suggestions.length === 5) break;
+    }
+    return suggestions;
+  }, [transactionTitle, transactions]);
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [plannedItems, setPlannedItems] = useState(initialPlannedItems);
@@ -397,7 +416,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
               <span className="text-[11px] font-bold">{userInitials}</span>
             </button>
             <button
-              onClick={() => { setNewTransactionType("expense"); setFormError(""); setIsModalOpen(true); }}
+              onClick={() => { setNewTransactionType("expense"); setTransactionTitle(""); setTitleSuggestionsOpen(false); setFormError(""); setIsModalOpen(true); }}
               className="ml-1 flex h-11 w-11 items-center justify-center gap-2 rounded-2xl bg-zinc-900 text-[13px] font-bold text-white shadow-lg shadow-zinc-900/15 transition hover:bg-zinc-800 active:scale-95 sm:w-auto sm:px-4"
             >
               <Plus size={18} /> <span className="hidden sm:inline">Nova transakcija</span>
@@ -614,10 +633,31 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                 <span className="flex h-10 items-center justify-center rounded-xl text-[12px] font-bold text-zinc-500 transition peer-checked:bg-white peer-checked:text-zinc-900 peer-checked:shadow-sm">Priliv</span>
               </label>
             </div>
-            <label className="mt-4 block text-[12px] font-semibold text-[#686b70]">
+            <div className="group mt-4" onKeyDown={(event) => {
+              if (event.key === "Escape") setTitleSuggestionsOpen(false);
+            }}>
+            <label className="block text-[12px] font-semibold text-[#686b70]">
               Naziv
-              <input name="title" placeholder={newTransactionType === "income" ? "Opcionalno, npr. Plata" : "Opcionalno, npr. Kupovina namirnica"} className="mt-2 h-12 w-full rounded-xl border border-zinc-200 px-3 text-[16px] outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50" />
+              <input name="title" autoComplete={newTransactionType === "expense" ? "off" : undefined}
+                value={transactionTitle} onFocus={() => setTitleSuggestionsOpen(true)}
+                onChange={(event) => { setTransactionTitle(event.target.value); setTitleSuggestionsOpen(true); }}
+                placeholder={newTransactionType === "income" ? "Opcionalno, npr. Penzija" : "Prodavnica, kafa, gorivo, pekara…"} className="mt-2 h-12 w-full rounded-xl border border-zinc-200 px-3 text-[16px] outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50" />
             </label>
+            {newTransactionType === "expense" && titleSuggestionsOpen && titleSuggestions.length > 0 && (
+              <ul aria-label="Predloženi nazivi odliva" className="mt-1 hidden divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white shadow-sm group-focus-within:block">
+                {titleSuggestions.map((title) => (
+                  <li key={title}>
+                    <button type="button" onClick={() => {
+                      setTransactionTitle(title);
+                      setTitleSuggestionsOpen(false);
+                    }} className="min-h-11 w-full break-words px-3 py-2 text-left text-sm text-zinc-800 hover:bg-emerald-50 focus-visible:bg-emerald-50">
+                      {title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            </div>
             <div className={cn("mt-4 grid gap-3", newTransactionType === "expense" ? "grid-cols-1 min-[390px]:grid-cols-2" : "grid-cols-1")}>
               <label className="text-[12px] font-semibold text-[#686b70]">
                 Iznos (€)
