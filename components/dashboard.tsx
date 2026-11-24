@@ -19,6 +19,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useConfirmation } from "@/components/confirmation-dialog";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -31,7 +32,7 @@ import type {
 
 import type { BudgetSettings } from "@/lib/budget";
 import { authClient } from "@/lib/auth-client";
-import type { PlannedItem, PlannedItemKind } from "@/lib/planned-items";
+import type { PlannedExpenseCategory, PlannedItem, PlannedItemKind } from "@/lib/planned-items";
 import type { RecurringItem } from "@/lib/recurring-items";
 import MonthlyExpenses from "@/components/monthly-expenses";
 import BankAccounts from "@/components/bank-accounts";
@@ -72,6 +73,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const currentPeriod = new Intl.DateTimeFormat("sr-Latn-ME", { month: "long", year: "numeric" }).format(new Date());
   const userInitials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((name) => name[0]).join("").toUpperCase() || "JA";
   const [budget, setBudget] = useState(initialBudget);
+  const { confirmRemoval, confirmation } = useConfirmation();
   const [draftBudget, setDraftBudget] = useState(initialBudget);
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetSaving, setBudgetSaving] = useState(false);
@@ -102,11 +104,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const next = {
-      household: Number(form.get("household")),
-      personal: Number(form.get("personal")),
+      household: draftBudget.household,
+      personal: draftBudget.personal,
       other: 0,
       cash: Number(form.get("cash")),
-      otp: Number(form.get("otp")),
+      otp: draftBudget.otp,
       nlb: Number(form.get("nlb")),
       additions: Number(form.get("additions")),
       expectedExpenses: Number(form.get("expectedExpenses")),
@@ -140,7 +142,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         activeFilter === "Sve" ||
         (activeFilter === "Prilivi" && transaction.type === "income") ||
         (activeFilter === "Odlivi" && transaction.type === "expense");
-      const matchesSearch = transaction.title.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = transaction.title.toLowerCase().includes(search.trim().toLowerCase());
       return matchesFilter && matchesSearch;
     });
   }, [activeFilter, search, transactions]);
@@ -155,11 +157,31 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const allRegularExpensesTotal = allFixedExpensesTotal + allSubscriptionsTotal;
   const paidRegularExpensesTotal = allRegularExpensesTotal - fixedExpensesTotal - subscriptionsTotal;
   const monthlyExpensesTotal = fixedExpensesTotal + subscriptionsTotal;
-  const transactionBalance = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
-  const totalBalance = budget.otp + nlbAvailable + budget.cash + additionsTotal - expectedExpensesTotal + transactionBalance;
-  const availableAfterPlans = totalBalance - monthlyExpensesTotal - budget.household - budget.personal;
-  const draftTotalBalance = draftBudget.otp + (draftBudget.nlb - 1300) + draftBudget.cash + additionsTotal - expectedExpensesTotal + transactionBalance;
-  const draftAvailableAfterPlans = draftTotalBalance - monthlyExpensesTotal - draftBudget.household - draftBudget.personal;
+  const householdSpent = sumExpenses("Kućni troškovi");
+  const personalSpent = sumExpenses("Lični troškovi");
+  function sumExpenses(category: TransactionCategory) {
+    return transactions.reduce((cents, item) => item.type === "expense" && item.category === category
+      ? cents + Math.round(Math.abs(item.amount) * 100) : cents, 0) / 100;
+  }
+  const incomeTotal = transactions.reduce((cents, item) => {
+    return item.type === "income" ? cents + Math.round(item.amount * 100) : cents;
+  }, 0) / 100;
+  const deductions = { otp: householdSpent + personalSpent - incomeTotal, household: householdSpent, personal: personalSpent, nlb: 0, cash: 0 };
+  const otpBalance = budget.otp - deductions.otp;
+  const totalBalance = otpBalance + nlbAvailable + budget.cash + additionsTotal;
+  function afterPlans(settings: BudgetSettings) {
+    const balance = settings.otp - deductions.otp + settings.nlb - 1300 + settings.cash + additionsTotal;
+    return Math.round((balance - expectedExpensesTotal - monthlyExpensesTotal
+      - (settings.household - householdSpent) - (settings.personal - personalSpent)) * 100) / 100;
+  }
+  const availableAfterPlans = afterPlans(budget);
+  const draftAvailableAfterPlans = afterPlans(draftBudget);
+
+  function applyUpdatedLimits(limits: { household: number; personal: number } | null) {
+    if (!limits) return;
+    setBudget((current) => ({ ...current, ...limits }));
+    setDraftBudget((current) => ({ ...current, ...limits }));
+  }
 
   async function addPlannedItem(event: React.FormEvent<HTMLFormElement>, kind: PlannedItemKind) {
     event.preventDefault();
@@ -171,9 +193,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
       description: String(form.get("description") ?? ""),
       amount: Number(form.get("amount")),
       kind,
+      expenseCategory: kind === "expectedExpense" ? form.get("expenseCategory") as PlannedExpenseCategory : null,
     });
     if (result.success) {
       setPlannedItems((current) => [...current, result.item]);
+      applyUpdatedLimits(result.limits);
       setPlannedItemForm(null);
       formElement.reset();
     } else {
@@ -184,7 +208,10 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
 
   async function removePlannedItem(item: PlannedItem) {
     const result = await deletePlannedItem(item.id);
-    if (result.success) setPlannedItems((current) => current.filter((entry) => entry.id !== item.id));
+    if (result.success) {
+      setPlannedItems((current) => current.filter((entry) => entry.id !== item.id));
+      applyUpdatedLimits(result.limits);
+    }
     else setPlannedItemMessage(result.message);
   }
 
@@ -197,9 +224,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
       id: item.id,
       description: String(form.get("description") ?? ""),
       amount: Number(form.get("amount")),
+      expenseCategory: item.kind === "expectedExpense" ? form.get("expenseCategory") as PlannedExpenseCategory : null,
     });
     if (result.success) {
       setPlannedItems((current) => current.map((entry) => entry.id === item.id ? result.item : entry));
+      applyUpdatedLimits(result.limits);
     } else {
       setPlannedItemMessage(result.message);
     }
@@ -207,7 +236,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   }
 
   async function removeTransaction(transaction: Transaction) {
-    if (!window.confirm(`Ukloniti transakciju „${transaction.title}“?`)) return;
+    if (!(await confirmRemoval(`Ukloniti transakciju „${transaction.title}“?`))) return;
 
     setDeletingId(transaction.id);
     setFormError("");
@@ -267,6 +296,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
 
   return (
     <div className="min-h-screen bg-[#f6f7f8] text-[#18181b]">
+      {confirmation}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] flex-col border-r border-zinc-200/80 bg-white lg:flex">
         <div className="flex h-[76px] items-center px-7">
           <div className="flex items-center gap-3">
@@ -343,14 +373,14 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         {activeNav === "Pregled" ? (
           <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
             <section id="overview" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
-              <SummaryCard featured title="Ukupno stanje" value={`${totalBalance < 0 ? "−" : ""}${formatMoney(totalBalance)} €`} icon={<WalletCards size={18} />} tone="dark" trend="Nakon očekivanih troškova" />
-              <SummaryCard title="OTP kartica" value={`${formatMoney(budget.otp)} €`} icon={<Landmark size={18} />} trend="Stanje na računu" />
+              <SummaryCard featured title="Ukupno stanje" value={`${totalBalance < 0 ? "−" : ""}${formatMoney(totalBalance)} €`} icon={<WalletCards size={18} />} tone="dark" trend="OTP + NLB + keš + dodaci" />
+              <SummaryCard title="OTP kartica" value={`${otpBalance < 0 ? "−" : ""}${formatMoney(otpBalance)} €`} icon={<Landmark size={18} />} trend="Stanje na računu" />
               <SummaryCard title="NLB kartica" value={`${nlbAvailable < 0 ? "−" : ""}${formatMoney(nlbAvailable)} €`} icon={<Landmark size={18} />} trend="NLB − 1.300 €" />
               <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<WalletCards size={18} />} trend="Gotovina" />
               <SummaryCard title="Mjesečni troškovi" value={`${formatMoney(monthlyExpensesTotal)} €`} icon={<Target size={18} />} trend={`${formatMoney(fixedExpensesTotal)} € fiksni + ${formatMoney(subscriptionsTotal)} € pretplate`} />
               <SummaryCard title="Dodaci" value={`${formatMoney(additionsTotal)} €`} icon={<ArrowDownLeft size={18} />} trend="Sigurni budući prilivi" />
-              <SummaryCard title="Očekivani troškovi" value={`${formatMoney(expectedExpensesTotal)} €`} icon={<ArrowUpRight size={18} />} trend="Oduzeti od ukupnog stanja" />
-              <SummaryCard featured title="Slobodno nakon planova" value={`${availableAfterPlans < 0 ? "−" : ""}${formatMoney(availableAfterPlans)} €`} icon={<Target size={18} />} tone={availableAfterPlans < 0 ? "danger" : availableAfterPlans === 0 ? "success" : "info"} trend="Stanje − mjesečni troškovi − kućni i lični limit" />
+              <SummaryCard title="Očekivani troškovi" value={`${formatMoney(expectedExpensesTotal)} €`} icon={<ArrowUpRight size={18} />} trend="Umanjuju mjesečne limite" />
+              <SummaryCard featured title="Slobodno nakon planova" value={`${availableAfterPlans < 0 ? "−" : ""}${formatMoney(availableAfterPlans)} €`} icon={<Target size={18} />} tone={availableAfterPlans < 0 ? "danger" : availableAfterPlans === 0 ? "success" : "info"} trend="Stanje − očekivani − mjesečni − kućni i lični limit" />
             </section>
 
             <section className="mt-3 md:mt-4">
@@ -397,7 +427,10 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                         ] as const).map(([key, label]) => (
                           <label key={key} className="text-sm font-bold text-[#555a60]">
                             {label} (€)
-                            <input name={key} type="number" required min="0" max="9999999999.99" step="0.01" value={Number.isFinite(draftBudget[key]) ? draftBudget[key] : 0} onChange={(event) => setDraftBudget((current) => ({ ...current, [key]: Number(event.target.value) }))} disabled={budgetSaving} className="mt-2 h-14 w-full rounded-xl border-2 border-[#cfd3d6] px-4 text-xl font-extrabold tracking-tight outline-none focus:border-[#6f8173]" />
+                            <input name={key} type="number" required min={-deductions[key]} max={9999999999.99 - deductions[key]} step="0.01" value={Math.round((draftBudget[key] - deductions[key]) * 100) / 100} onChange={(event) => {
+                              const amount = Number(event.target.value);
+                              setDraftBudget((current) => ({ ...current, [key]: Math.round((amount + deductions[key]) * 100) / 100 }));
+                            }} disabled={budgetSaving} className="mt-2 h-14 w-full rounded-xl border-2 border-[#cfd3d6] px-4 text-xl font-extrabold tracking-tight outline-none focus:border-[#6f8173]" />
                           </label>
                         ))}
                         <p className="rounded-lg bg-[#f4f5f7] px-3 py-3 text-xs text-[#686b70] sm:col-span-2">NLB raspoloživo se računa automatski: uneseno stanje minus 1.300 €.</p>
@@ -408,7 +441,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                       </form>
                       <div className="grid gap-3 border-t border-[#e7e8ea] pt-4 md:grid-cols-2">
                         <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} />
-                        <PlannedItemsCard title="Očekivani troškovi" subtitle="Oduzimaju se od ukupnog stanja" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} />
+                        <PlannedItemsCard title="Očekivani troškovi" subtitle="Umanjuju izabrani mjesečni limit" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} />
                       </div>
                       {plannedItemMessage && <p role="alert" className="rounded-xl bg-[#f7eeee] px-4 py-3 text-sm text-[#9b3d3d]">{plannedItemMessage}</p>}
                     </>
@@ -423,9 +456,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                 <h2 className="text-[15px] font-bold">Posljednje transakcije</h2>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <div className="flex w-full rounded-xl bg-zinc-100 p-1 sm:w-auto">
-                    {["Sve", "Prilivi", "Odlivovi"].map((filter) => (
+                    {["Sve", "Prilivi", "Odlivi"].map((filter) => (
                       <button
                         key={filter}
+                        type="button"
+                        aria-pressed={filter === activeFilter}
                         onClick={() => setActiveFilter(filter)}
                         className={cn(
                           "h-8 flex-1 rounded-lg px-3 text-[11px] font-bold transition active:scale-[0.98] sm:flex-none",
@@ -450,6 +485,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                 </div>
               </div>
               <div className="divide-y divide-[#f0f1f2]">
+                {filteredTransactions.length === 0 && (
+                  <p role="status" className="px-4 py-4 text-sm text-zinc-500 md:px-6">
+                    {transactions.length === 0 ? "Još nema evidentiranih transakcija." : "Nema transakcija za izabrani filter ili pretragu."}
+                  </p>
+                )}
                 {filteredTransactions.map((transaction) => (
                   <TransactionRow key={transaction.id} transaction={transaction} deleting={deletingId === transaction.id} onDelete={() => removeTransaction(transaction)} />
                 ))}
@@ -587,6 +627,15 @@ function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, savin
         <form onSubmit={(event) => onSubmit(event, kind)} className="mt-4 grid grid-cols-[1fr_110px] gap-2 rounded-xl bg-[#f5f6f7] p-3">
           <input name="description" required maxLength={120} placeholder="Opis" aria-label={`Opis za ${title.toLowerCase()}`} className="h-10 min-w-0 rounded-lg border border-[#dfe1e3] bg-white px-3 text-sm outline-none focus:border-[#919b93]" />
           <input name="amount" required type="number" min="0.01" max="9999999999.99" step="0.01" placeholder="Iznos €" aria-label={`Iznos za ${title.toLowerCase()}`} className="h-11 min-w-0 rounded-lg border border-[#cfd3d6] bg-white px-3 text-base font-bold outline-none focus:border-[#6f8173]" />
+          {kind === "expectedExpense" ? (
+            <label className="col-span-2 text-xs font-semibold text-zinc-600">Umanjiti limit
+              <select name="expenseCategory" required defaultValue="" className="mt-1.5 h-11 w-full rounded-lg border border-[#cfd3d6] bg-white px-3 text-[16px] font-semibold outline-none focus:border-[#6f8173] sm:text-sm">
+                <option value="" disabled>Izaberite vrstu troška</option>
+                <option value="household">Kućni troškovi</option>
+                <option value="personal">Lični troškovi</option>
+              </select>
+            </label>
+          ) : null}
           <button disabled={saving} className="col-span-2 h-10 rounded-lg bg-[#202124] text-xs font-bold text-white disabled:opacity-60">{saving ? "Čuvanje..." : "Sačuvaj stavku"}</button>
         </form>
       )}
@@ -602,6 +651,15 @@ function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, savin
             <button type="button" onClick={() => onDelete(item)} aria-label={`Ukloni ${item.description}`} title="Ukloni stavku" className="grid h-10 w-9 shrink-0 place-items-center rounded-lg border border-zinc-200 text-[#8b8e93] hover:bg-red-50 hover:text-red-600 sm:w-10">
               <Trash2 size={15} />
             </button>
+            {item.kind === "expectedExpense" ? (
+              <label className="col-span-2 text-[11px] font-semibold text-zinc-600">Umanjiti
+                <select name="expenseCategory" required defaultValue={item.expenseCategory ?? ""} className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-[16px] font-semibold outline-none focus:border-emerald-600 sm:text-sm">
+                  <option value="" disabled>Izaberite</option>
+                  <option value="household">Kućne troškove</option>
+                  <option value="personal">Lične troškove</option>
+                </select>
+              </label>
+            ) : null}
           </form>
         ))}
       </div>

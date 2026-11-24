@@ -58,6 +58,7 @@ async function loadDashboardData() {
       description: item.description,
       amount: Number(item.amount),
       kind: item.kind === "ADDITION" ? "addition" : "expectedExpense",
+      expenseCategory: item.expenseCategory === "HOUSEHOLD" ? "household" : item.expenseCategory === "PERSONAL" ? "personal" : null,
     }));
     const currentCycle = getBudgetCycle();
     const recurringItems: RecurringItem[] = savedRecurringItems.map((item) => ({

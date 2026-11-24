@@ -10,7 +10,7 @@ import type {
   TransactionCategory,
 } from "@/lib/transactions";
 import { serializeTransaction } from "@/lib/transactions";
-import type { PlannedItemKind } from "@/lib/planned-items";
+import type { PlannedExpenseCategory, PlannedItemKind } from "@/lib/planned-items";
 import type { RecurringItemKind } from "@/lib/recurring-items";
 import { getBudgetCycle } from "@/lib/billing-cycle";
 
@@ -92,49 +92,68 @@ export async function deleteTransaction(id: string) {
   }
 }
 
-export async function createPlannedItem(input: { description: string; amount: number; kind: PlannedItemKind }) {
+export async function createPlannedItem(input: { description: string; amount: number; kind: PlannedItemKind; expenseCategory: PlannedExpenseCategory | null }) {
   if (!(await auth.api.getSession({ headers: await headers() }))) {
     return { success: false as const, message: "Sesija je istekla. Prijavite se ponovo." };
   }
 
   const description = typeof input?.description === "string" ? input.description.trim() : "";
-  if (!description || description.length > 120 || !Number.isFinite(input?.amount) || input.amount <= 0 || input.amount > 9_999_999_999.99 || (input.kind !== "addition" && input.kind !== "expectedExpense")) {
+  const expenseCategory = input.expenseCategory === "household" || input.expenseCategory === "personal" ? input.expenseCategory : null;
+  if (!description || description.length > 120 || !Number.isFinite(input?.amount) || input.amount <= 0 || input.amount > 9_999_999_999.99 || (input.kind !== "addition" && input.kind !== "expectedExpense") || (input.kind === "expectedExpense" && !expenseCategory)) {
     return { success: false as const, message: "Unesite opis i ispravan iznos." };
   }
 
   try {
-    const item = await prisma.plannedItem.create({
-      data: {
-        description,
-        amount: input.amount.toFixed(2),
-        kind: input.kind === "addition" ? "ADDITION" : "EXPECTED_EXPENSE",
-      },
+    const { item, limits } = await prisma.$transaction(async (tx) => {
+      const settings = await tx.budgetSettings.findUnique({ where: { id: "default" } });
+      if (input.kind === "expectedExpense" && (!settings || Number(expenseCategory === "household" ? settings.household : settings.personal) < input.amount)) {
+        throw new Error("LIMIT_TOO_LOW");
+      }
+      const item = await tx.plannedItem.create({ data: { description, amount: input.amount.toFixed(2), kind: input.kind === "addition" ? "ADDITION" : "EXPECTED_EXPENSE", expenseCategory: input.kind === "expectedExpense" ? (expenseCategory === "household" ? "HOUSEHOLD" : "PERSONAL") : null } });
+      const updated = input.kind === "expectedExpense"
+        ? await tx.budgetSettings.update({ where: { id: "default" }, data: expenseCategory === "household" ? { household: { decrement: input.amount } } : { personal: { decrement: input.amount } } })
+        : settings;
+      return { item, limits: updated ? { household: Number(updated.household), personal: Number(updated.personal) } : null };
     });
     return {
       success: true as const,
-      item: { id: item.id, description: item.description, amount: Number(item.amount), kind: input.kind },
+      item: { id: item.id, description: item.description, amount: Number(item.amount), kind: input.kind, expenseCategory },
+      limits,
     };
   } catch (error) {
     console.error("Neuspješno čuvanje planirane stavke.", error);
+    if (error instanceof Error && error.message === "LIMIT_TOO_LOW") return { success: false as const, message: "Očekivani trošak je veći od izabranog mjesečnog limita." };
     return { success: false as const, message: "Stavka nije sačuvana. Pokušajte ponovo." };
   }
 }
 
-export async function updatePlannedItem(input: { id: string; description: string; amount: number }) {
+export async function updatePlannedItem(input: { id: string; description: string; amount: number; expenseCategory: PlannedExpenseCategory | null }) {
   if (!(await auth.api.getSession({ headers: await headers() }))) {
     return { success: false as const, message: "Sesija je istekla. Prijavite se ponovo." };
   }
 
   const id = typeof input?.id === "string" ? input.id.trim() : "";
   const description = typeof input?.description === "string" ? input.description.trim() : "";
+  const expenseCategory = input.expenseCategory === "household" || input.expenseCategory === "personal" ? input.expenseCategory : null;
   if (!id || !description || description.length > 120 || !Number.isFinite(input?.amount) || input.amount <= 0 || input.amount > 9_999_999_999.99) {
     return { success: false as const, message: "Unesite opis i ispravan iznos." };
   }
 
   try {
-    const item = await prisma.plannedItem.update({
-      where: { id },
-      data: { description, amount: input.amount.toFixed(2) },
+    const existing = await prisma.plannedItem.findUnique({ where: { id } });
+    if (!existing || (existing.kind === "EXPECTED_EXPENSE" && !expenseCategory)) {
+      return { success: false as const, message: "Izaberite kućne ili lične troškove." };
+    }
+    const { item, limits } = await prisma.$transaction(async (tx) => {
+      let settings = await tx.budgetSettings.findUnique({ where: { id: "default" } });
+      if (existing.kind === "EXPECTED_EXPENSE" && settings) {
+        if (existing.expenseCategory === "HOUSEHOLD") settings = await tx.budgetSettings.update({ where: { id: "default" }, data: { household: { increment: Number(existing.amount) } } });
+        if (existing.expenseCategory === "PERSONAL") settings = await tx.budgetSettings.update({ where: { id: "default" }, data: { personal: { increment: Number(existing.amount) } } });
+        if (Number(expenseCategory === "household" ? settings.household : settings.personal) < input.amount) throw new Error("LIMIT_TOO_LOW");
+        settings = await tx.budgetSettings.update({ where: { id: "default" }, data: expenseCategory === "household" ? { household: { decrement: input.amount } } : { personal: { decrement: input.amount } } });
+      }
+      const item = await tx.plannedItem.update({ where: { id }, data: { description, amount: input.amount.toFixed(2), expenseCategory: existing.kind === "EXPECTED_EXPENSE" ? (expenseCategory === "household" ? "HOUSEHOLD" : "PERSONAL") : null } });
+      return { item, limits: settings ? { household: Number(settings.household), personal: Number(settings.personal) } : null };
     });
     return {
       success: true as const,
@@ -143,10 +162,13 @@ export async function updatePlannedItem(input: { id: string; description: string
         description: item.description,
         amount: Number(item.amount),
         kind: item.kind === "ADDITION" ? "addition" as const : "expectedExpense" as const,
+        expenseCategory: item.expenseCategory === "HOUSEHOLD" ? "household" as const : item.expenseCategory === "PERSONAL" ? "personal" as const : null,
       },
+      limits,
     };
   } catch (error) {
     console.error("Neuspješno mijenjanje planirane stavke.", error);
+    if (error instanceof Error && error.message === "LIMIT_TOO_LOW") return { success: false as const, message: "Očekivani trošak je veći od izabranog mjesečnog limita." };
     return { success: false as const, message: "Izmjena nije sačuvana. Pokušajte ponovo." };
   }
 }
@@ -159,8 +181,16 @@ export async function deletePlannedItem(id: string) {
     return { success: false as const, message: "Stavka nije pronađena." };
   }
   try {
-    await prisma.plannedItem.delete({ where: { id } });
-    return { success: true as const };
+    const { limits } = await prisma.$transaction(async (tx) => {
+      const item = await tx.plannedItem.findUnique({ where: { id } });
+      if (!item) throw new Error("NOT_FOUND");
+      let settings = await tx.budgetSettings.findUnique({ where: { id: "default" } });
+      if (item.kind === "EXPECTED_EXPENSE" && item.expenseCategory === "HOUSEHOLD") settings = await tx.budgetSettings.update({ where: { id: "default" }, data: { household: { increment: Number(item.amount) } } });
+      if (item.kind === "EXPECTED_EXPENSE" && item.expenseCategory === "PERSONAL") settings = await tx.budgetSettings.update({ where: { id: "default" }, data: { personal: { increment: Number(item.amount) } } });
+      await tx.plannedItem.delete({ where: { id } });
+      return { limits: settings ? { household: Number(settings.household), personal: Number(settings.personal) } : null };
+    });
+    return { success: true as const, limits };
   } catch (error) {
     console.error("Neuspješno uklanjanje planirane stavke.", error);
     return { success: false as const, message: "Stavka nije uklonjena." };

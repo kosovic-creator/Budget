@@ -2,6 +2,7 @@
 
 import { Plus, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useConfirmation } from "@/components/confirmation-dialog";
 import { addBankDeduction, deleteBankAccount, deleteBankDeduction, saveBankAccount } from "@/app/actions";
 import type { BankAccount } from "@/lib/bank";
 
@@ -15,6 +16,7 @@ function money(value: number) {
 
 export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
   const [accounts, setAccounts] = useState(initialAccounts);
+  const { confirmRemoval, confirmation } = useConfirmation();
   const [adding, setAdding] = useState(false);
   const [deductionFormAccountId, setDeductionFormAccountId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
   }
 
   async function removeAccount(account: BankAccount) {
-    if (!window.confirm(`Ukloniti „${account.name}“ i sve njegove odbitke?`)) return;
+    if (!(await confirmRemoval(`Ukloniti „${account.name}“ i sve njegove odbitke?`))) return;
     setBusy(account.id);
     const result = await deleteBankAccount(account.id);
     if (result.success) setAccounts((current) => current.filter((item) => item.id !== account.id)); else setMessage(result.message);
@@ -64,6 +66,7 @@ export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
 
   return (
     <section className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
+      {confirmation}
       <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-[0_2px_12px_rgba(24,24,27,0.035)] md:p-6">
         <div>
           <div><h2 className="text-xl font-bold tracking-tight text-zinc-900">Banka</h2><p className="mt-1 text-sm leading-6 text-zinc-500">Računi i planirani odbici.</p></div>

@@ -2,6 +2,7 @@
 
 import { CircleCheckBig, CreditCard, Plus, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useConfirmation } from "@/components/confirmation-dialog";
 import { deleteRecurringItem, payRecurringItem, saveRecurringItem } from "@/app/actions";
 import type { RecurringItem, RecurringItemKind } from "@/lib/recurring-items";
 import type { Transaction } from "@/lib/transactions";
@@ -19,6 +20,7 @@ function formatMoney(value: number) {
 
 export default function MonthlyExpenses({ view, items, onItemsChange, onPaid }: MonthlyExpensesProps) {
   const [adding, setAdding] = useState(false);
+  const { confirmRemoval, confirmation } = useConfirmation();
   const [savingId, setSavingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const visibleItems = items.filter((item) => item.kind === view);
@@ -40,7 +42,7 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid }: 
   }
 
   async function remove(item: RecurringItem) {
-    if (!window.confirm(`Ukloniti stavku „${item.name}“?`)) return;
+    if (!(await confirmRemoval(`Ukloniti stavku „${item.name}“?`))) return;
     setSavingId(item.id);
     const result = await deleteRecurringItem(item.id);
     if (result.success) onItemsChange(items.filter((entry) => entry.id !== item.id));
@@ -64,6 +66,7 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid }: 
 
   return (
     <section className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
+      {confirmation}
       <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-[0_2px_12px_rgba(24,24,27,0.035)] md:p-6">
         <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between">
           <div>
