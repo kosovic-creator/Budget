@@ -120,6 +120,37 @@ export async function createPlannedItem(input: { description: string; amount: nu
   }
 }
 
+export async function updatePlannedItem(input: { id: string; description: string; amount: number }) {
+  if (!(await auth.api.getSession({ headers: await headers() }))) {
+    return { success: false as const, message: "Sesija je istekla. Prijavite se ponovo." };
+  }
+
+  const id = typeof input?.id === "string" ? input.id.trim() : "";
+  const description = typeof input?.description === "string" ? input.description.trim() : "";
+  if (!id || !description || description.length > 120 || !Number.isFinite(input?.amount) || input.amount <= 0 || input.amount > 9_999_999_999.99) {
+    return { success: false as const, message: "Unesite opis i ispravan iznos." };
+  }
+
+  try {
+    const item = await prisma.plannedItem.update({
+      where: { id },
+      data: { description, amount: input.amount.toFixed(2) },
+    });
+    return {
+      success: true as const,
+      item: {
+        id: item.id,
+        description: item.description,
+        amount: Number(item.amount),
+        kind: item.kind === "ADDITION" ? "addition" as const : "expectedExpense" as const,
+      },
+    };
+  } catch (error) {
+    console.error("Neuspješno mijenjanje planirane stavke.", error);
+    return { success: false as const, message: "Izmjena nije sačuvana. Pokušajte ponovo." };
+  }
+}
+
 export async function deletePlannedItem(id: string) {
   if (!(await auth.api.getSession({ headers: await headers() }))) {
     return { success: false as const, message: "Sesija je istekla. Prijavite se ponovo." };

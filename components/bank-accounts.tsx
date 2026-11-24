@@ -16,6 +16,7 @@ function money(value: number) {
 export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
   const [accounts, setAccounts] = useState(initialAccounts);
   const [adding, setAdding] = useState(false);
+  const [deductionFormAccountId, setDeductionFormAccountId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const total = accounts.reduce((sum, account) => sum + account.amount - account.deductions.reduce((deductions, item) => deductions + item.amount, 0), 0);
@@ -49,6 +50,7 @@ export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
     if (result.success) {
       setAccounts((current) => current.map((item) => item.id === account.id ? { ...item, deductions: [...item.deductions, result.deduction] } : item));
       formElement.reset();
+      setDeductionFormAccountId(null);
     } else setMessage(result.message);
     setBusy(null);
   }
@@ -97,11 +99,18 @@ export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
                       <button type="button" onClick={() => removeDeduction(account.id, deduction.id)} disabled={busy === deduction.id} aria-label={`Ukloni odbitak ${deduction.description}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button>
                     </div>
                   ))}
-                  <form onSubmit={(event) => addDeduction(event, account)} className="mt-3 grid gap-3 min-[430px]:grid-cols-[1fr_140px_auto]">
-                    <Field label="Opis odbitka" name="description" />
-                    <Field label="Iznos odbitka (€)" name="deductionAmount" type="number" min="0.01" step="0.01" />
-                    <button disabled={busy === `deduction-${account.id}`} className="h-12 self-end rounded-xl bg-zinc-900 px-4 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-50">Dodaj odbitak</button>
-                  </form>
+                  {deductionFormAccountId === account.id ? (
+                    <form onSubmit={(event) => addDeduction(event, account)} className="mt-3 grid grid-cols-[minmax(0,1fr)_90px] items-end gap-2 rounded-xl bg-zinc-50 p-3 min-[430px]:grid-cols-[1fr_140px_auto]">
+                      <Field label="Opis odbitka" name="description" autoFocus />
+                      <Field label="Iznos (€)" name="deductionAmount" type="number" inputMode="decimal" min="0.01" step="0.01" />
+                      <div className="col-span-2 flex gap-2 min-[430px]:col-span-1">
+                        <button disabled={busy === `deduction-${account.id}`} aria-label="Sačuvaj odbitak" title="Sačuvaj" className="grid h-11 w-11 place-items-center rounded-xl bg-zinc-900 text-white transition active:scale-[0.98] disabled:opacity-50 min-[430px]:h-12 min-[430px]:w-12"><Save size={17} /></button>
+                        <button type="button" onClick={() => setDeductionFormAccountId(null)} className="h-11 rounded-xl border border-zinc-200 px-3 text-xs font-bold text-zinc-700 min-[430px]:h-12">Otkaži</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <button type="button" onClick={() => setDeductionFormAccountId(account.id)} className="mt-3 flex h-11 items-center gap-2 rounded-xl border border-zinc-200 px-3 text-sm font-bold text-zinc-800 transition active:scale-[0.98]"><Plus size={16} /> Dodaj odbitak</button>
+                  )}
                    <div className="mt-4 flex items-center justify-between rounded-xl bg-emerald-50 px-4 py-3"><span className="text-sm font-semibold text-emerald-950">{account.name} nakon odbitaka</span><strong className="text-emerald-950">{money(account.amount - deductions)} €</strong></div>
                 </div>
               </article>

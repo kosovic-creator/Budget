@@ -3,13 +3,13 @@
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  Bell,
   ChevronRight,
   Fingerprint,
   Home,
   Landmark,
   LayoutGrid,
   Plus,
+  Save,
   Search,
   Target,
   WalletCards,
@@ -22,7 +22,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
-import { createPlannedItem, createTransaction, deletePlannedItem, deleteTransaction, saveBudget } from "@/app/actions";
+import { createPlannedItem, createTransaction, deletePlannedItem, deleteTransaction, saveBudget, updatePlannedItem } from "@/app/actions";
 import type {
   NewTransaction,
   Transaction,
@@ -188,6 +188,24 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
     else setPlannedItemMessage(result.message);
   }
 
+  async function editPlannedItem(event: React.FormEvent<HTMLFormElement>, item: PlannedItem) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setPlannedItemSaving(true);
+    setPlannedItemMessage("");
+    const result = await updatePlannedItem({
+      id: item.id,
+      description: String(form.get("description") ?? ""),
+      amount: Number(form.get("amount")),
+    });
+    if (result.success) {
+      setPlannedItems((current) => current.map((entry) => entry.id === item.id ? result.item : entry));
+    } else {
+      setPlannedItemMessage(result.message);
+    }
+    setPlannedItemSaving(false);
+  }
+
   async function removeTransaction(transaction: Transaction) {
     if (!window.confirm(`Ukloniti transakciju „${transaction.title}“?`)) return;
 
@@ -304,9 +322,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
             <button onClick={addPasskey} disabled={isAddingPasskey} aria-label="Dodaj ovaj uređaj za sigurnu prijavu" title="Zaštiti ovaj uređaj" className="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition active:scale-95 disabled:opacity-50">
               <Fingerprint size={18} />
             </button>
-            <button aria-label="Obavještenja" className="hidden h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition active:scale-95 min-[380px]:grid">
-              <Bell size={17} />
-            </button>
             <button onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => { router.replace("/sign-in"); router.refresh(); } } })} aria-label="Odjavi se" title={`Odjavi se (${userName})`} className="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition active:scale-95 lg:hidden">
               <span className="text-[11px] font-bold">{userInitials}</span>
             </button>
@@ -392,8 +407,8 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                         </div>
                       </form>
                       <div className="grid gap-3 border-t border-[#e7e8ea] pt-4 md:grid-cols-2">
-                        <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onDelete={removePlannedItem} />
-                        <PlannedItemsCard title="Očekivani troškovi" subtitle="Oduzimaju se od ukupnog stanja" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onDelete={removePlannedItem} />
+                        <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} />
+                        <PlannedItemsCard title="Očekivani troškovi" subtitle="Oduzimaju se od ukupnog stanja" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} />
                       </div>
                       {plannedItemMessage && <p role="alert" className="rounded-xl bg-[#f7eeee] px-4 py-3 text-sm text-[#9b3d3d]">{plannedItemMessage}</p>}
                     </>
@@ -549,10 +564,11 @@ interface PlannedItemsCardProps {
   saving: boolean;
   onToggleForm: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>, kind: PlannedItemKind) => Promise<void>;
+  onEdit: (event: React.FormEvent<HTMLFormElement>, item: PlannedItem) => Promise<void>;
   onDelete: (item: PlannedItem) => Promise<void>;
 }
 
-function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, saving, onToggleForm, onSubmit, onDelete }: PlannedItemsCardProps) {
+function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, saving, onToggleForm, onSubmit, onEdit, onDelete }: PlannedItemsCardProps) {
   const visibleItems = items.filter((item) => item.kind === kind);
 
   return (
@@ -579,13 +595,14 @@ function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, savin
         {visibleItems.length === 0 ? (
           <p className="py-4 text-sm text-[#9a9da2]">Još nema unesenih stavki.</p>
         ) : visibleItems.map((item) => (
-          <div key={item.id} className="flex min-h-12 items-center gap-3 py-2">
-            <p className="min-w-0 flex-1 truncate text-sm font-medium">{item.description}</p>
-            <p className="shrink-0 text-base font-bold">{formatMoney(item.amount)} €</p>
-            <button type="button" onClick={() => onDelete(item)} aria-label={`Ukloni ${item.description}`} title="Ukloni stavku" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[#8b8e93] hover:bg-red-50 hover:text-red-600">
+          <form key={item.id} onSubmit={(event) => onEdit(event, item)} className="grid grid-cols-[minmax(0,1fr)_82px_38px_38px] items-end gap-1.5 py-2 sm:grid-cols-[minmax(0,1fr)_110px_40px_40px]">
+            <label className="min-w-0 text-[11px] font-semibold text-zinc-600">Opis<input name="description" required maxLength={120} defaultValue={item.description} className="mt-1 h-10 w-full min-w-0 rounded-lg border border-zinc-200 px-2 text-[16px] font-medium outline-none focus:border-emerald-600 sm:text-sm" /></label>
+            <label className="min-w-0 text-[11px] font-semibold text-zinc-600">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" max="9999999999.99" step="0.01" defaultValue={item.amount} className="mt-1 h-10 w-full min-w-0 rounded-lg border border-zinc-200 px-2 text-[16px] font-bold outline-none focus:border-emerald-600 sm:text-sm" /></label>
+            <button disabled={saving} aria-label={`Sačuvaj ${item.description}`} title="Sačuvaj" className="grid h-10 w-9 place-items-center rounded-lg border border-zinc-200 text-zinc-700 transition active:scale-95 disabled:opacity-50 sm:w-10"><Save size={16} /></button>
+            <button type="button" onClick={() => onDelete(item)} aria-label={`Ukloni ${item.description}`} title="Ukloni stavku" className="grid h-10 w-9 shrink-0 place-items-center rounded-lg border border-zinc-200 text-[#8b8e93] hover:bg-red-50 hover:text-red-600 sm:w-10">
               <Trash2 size={15} />
             </button>
-          </div>
+          </form>
         ))}
       </div>
 
