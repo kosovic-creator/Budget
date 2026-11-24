@@ -327,121 +327,121 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
 
         {activeNav === "Pregled" ? (
           <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
-          <section id="overview" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
-            <SummaryCard featured title="Ukupno stanje" value={`${totalBalance < 0 ? "−" : ""}${formatMoney(totalBalance)} €`} icon={<WalletCards size={18} />} tone="dark" trend="Nakon očekivanih troškova" />
-            <SummaryCard title="OTP račun" value={`${formatMoney(budget.otp)} €`} icon={<Landmark size={18} />} trend="Stanje na računu" />
-            <SummaryCard title="NLB umanjeno" value={`${nlbAvailable < 0 ? "−" : ""}${formatMoney(nlbAvailable)} €`} icon={<Landmark size={18} />} trend="NLB − 1.300 €" />
-            <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<WalletCards size={18} />} trend="Gotovina" />
-            <SummaryCard title="Mjesečni troškovi" value={`${formatMoney(monthlyExpensesTotal)} €`} icon={<Target size={18} />} trend={`${formatMoney(fixedExpensesTotal)} € fiksni + ${formatMoney(subscriptionsTotal)} € pretplate`} />
-            <SummaryCard title="Dodaci" value={`${formatMoney(additionsTotal)} €`} icon={<ArrowDownLeft size={18} />} trend="Sigurni budući prilivi" />
-            <SummaryCard title="Očekivani troškovi" value={`${formatMoney(expectedExpensesTotal)} €`} icon={<ArrowUpRight size={18} />} trend="Oduzeti od ukupnog stanja" />
-            <SummaryCard featured title="Slobodno nakon planova" value={`${availableAfterPlans < 0 ? "−" : ""}${formatMoney(availableAfterPlans)} €`} icon={<Target size={18} />} tone={availableAfterPlans < 0 ? "danger" : availableAfterPlans === 0 ? "success" : "info"} trend="Stanje − mjesečni troškovi − kućni i lični limit" />
-          </section>
+            <section id="overview" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+              <SummaryCard featured title="Ukupno stanje" value={`${totalBalance < 0 ? "−" : ""}${formatMoney(totalBalance)} €`} icon={<WalletCards size={18} />} tone="dark" trend="Nakon očekivanih troškova" />
+              <SummaryCard title="OTP kartica" value={`${formatMoney(budget.otp)} €`} icon={<Landmark size={18} />} trend="Stanje na računu" />
+              <SummaryCard title="NLB kartica" value={`${nlbAvailable < 0 ? "−" : ""}${formatMoney(nlbAvailable)} €`} icon={<Landmark size={18} />} trend="NLB − 1.300 €" />
+              <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<WalletCards size={18} />} trend="Gotovina" />
+              <SummaryCard title="Mjesečni troškovi" value={`${formatMoney(monthlyExpensesTotal)} €`} icon={<Target size={18} />} trend={`${formatMoney(fixedExpensesTotal)} € fiksni + ${formatMoney(subscriptionsTotal)} € pretplate`} />
+              <SummaryCard title="Dodaci" value={`${formatMoney(additionsTotal)} €`} icon={<ArrowDownLeft size={18} />} trend="Sigurni budući prilivi" />
+              <SummaryCard title="Očekivani troškovi" value={`${formatMoney(expectedExpensesTotal)} €`} icon={<ArrowUpRight size={18} />} trend="Oduzeti od ukupnog stanja" />
+              <SummaryCard featured title="Slobodno nakon planova" value={`${availableAfterPlans < 0 ? "−" : ""}${formatMoney(availableAfterPlans)} €`} icon={<Target size={18} />} tone={availableAfterPlans < 0 ? "danger" : availableAfterPlans === 0 ? "success" : "info"} trend="Stanje − mjesečni troškovi − kućni i lični limit" />
+            </section>
 
-          <section className="mt-3 md:mt-4">
-            <div id="plans" className="scroll-mt-20 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-[0_2px_12px_rgba(24,24,27,0.035)] md:p-6">
-              <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between">
-                <div>
-                  <p className="text-[13px] font-semibold text-[#777b82]">Mjesečni limiti troškova</p>
-                  <p className="mt-1 text-[11px] text-[#a2a4a8]">Za svaku kategoriju vidiš potrošeno, limit i preostali iznos.</p>
-                </div>
-                <button
-                  type={editingBudget ? "submit" : "button"}
-                  form={editingBudget ? "budget-settings-form" : undefined}
-                  onClick={editingBudget ? undefined : (event) => { event.preventDefault(); setDraftBudget(budget); setEditingBudget(true); setBudgetMessage(""); }}
-                  disabled={budgetSaving}
-                  className={cn("min-h-12 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition disabled:opacity-60", editingBudget ? "bg-[#31724a] text-white hover:bg-[#285f3e]" : "bg-[#202124] text-white hover:bg-[#34363a]")}
-                >
-                  {editingBudget ? (budgetSaving ? "Čuvanje..." : "✓ Sačuvaj i završi") : "+ Unos stanja i plana"}
-                </button>
-              </div>
-              <div className="mt-4 space-y-4 md:mt-5 md:space-y-5">
-                {([
-                  ["Kućni troškovi", budget.household, "#7e927f"],
-                  ["Lični troškovi", budget.personal, "#b9a578"],
-                ] as const).map(([label, total, color]) => {
-                  const spent = Math.abs(transactions.filter(item => item.type === "expense" && item.category === label).reduce((sum, item) => sum + item.amount, 0));
-                  return <BudgetRow key={label} label={label} spent={spent} total={total} percent={total > 0 ? Math.min(100, spent / total * 100) : 0} color={color} />;
-                })}
-                <BudgetRow
-                  label="Redovni troškovi"
-                  spent={paidRegularExpensesTotal}
-                  total={allRegularExpensesTotal}
-                  percent={allRegularExpensesTotal > 0 ? Math.min(100, paidRegularExpensesTotal / allRegularExpensesTotal * 100) : 0}
-                  color="#4f7ca8"
-                />
-                {editingBudget && (
-                  <>
-                  <form id="budget-settings-form" onSubmit={submitBudget} className="grid gap-3 border-t border-[#e7e8ea] pt-4 sm:grid-cols-2">
-                    {([
-                      ["otp", "Stanje na OTP računu"],
-                      ["nlb", "Ukupno stanje na NLB računu"],
-                      ["household", "Mjesečni limit za kućne troškove"],
-                      ["personal", "Mjesečni limit za lične troškove"],
-                      ["cash", "Trenutni iznos keša"],
-                    ] as const).map(([key, label]) => (
-                      <label key={key} className="text-sm font-bold text-[#555a60]">
-                        {label} (€)
-                        <input name={key} type="number" required min="0" max="9999999999.99" step="0.01" value={Number.isFinite(draftBudget[key]) ? draftBudget[key] : 0} onChange={(event) => setDraftBudget((current) => ({ ...current, [key]: Number(event.target.value) }))} disabled={budgetSaving} className="mt-2 h-14 w-full rounded-xl border-2 border-[#cfd3d6] px-4 text-xl font-extrabold tracking-tight outline-none focus:border-[#6f8173]" />
-                      </label>
-                    ))}
-                    <p className="rounded-lg bg-[#f4f5f7] px-3 py-3 text-xs text-[#686b70] sm:col-span-2">NLB raspoloživo se računa automatski: uneseno stanje minus 1.300 €.</p>
-                    <div className={cn("rounded-xl px-4 py-4 text-white sm:col-span-2", draftAvailableAfterPlans < 0 ? "bg-rose-700" : draftAvailableAfterPlans === 0 ? "bg-emerald-700" : "bg-blue-700")}>
-                      <p className="text-sm font-bold text-white/80">Slobodno nakon planova — pregled uživo</p>
-                      <p className="mt-1 text-2xl font-extrabold">{draftAvailableAfterPlans < 0 ? "−" : ""}{formatMoney(draftAvailableAfterPlans)} €</p>
-                    </div>
-                  </form>
-                  <div className="grid gap-3 border-t border-[#e7e8ea] pt-4 md:grid-cols-2">
-                    <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onDelete={removePlannedItem} />
-                    <PlannedItemsCard title="Očekivani troškovi" subtitle="Oduzimaju se od ukupnog stanja" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onDelete={removePlannedItem} />
+            <section className="mt-3 md:mt-4">
+              <div id="plans" className="scroll-mt-20 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-[0_2px_12px_rgba(24,24,27,0.035)] md:p-6">
+                <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between">
+                  <div>
+                    <p className="text-[13px] font-semibold text-[#777b82]">Mjesečni limiti troškova</p>
+                    <p className="mt-1 text-[11px] text-[#a2a4a8]">Za svaku kategoriju vidiš potrošeno, limit i preostali iznos.</p>
                   </div>
-                  {plannedItemMessage && <p role="alert" className="rounded-xl bg-[#f7eeee] px-4 py-3 text-sm text-[#9b3d3d]">{plannedItemMessage}</p>}
-                  </>
-                )}
-                {budgetMessage && <p role="status" className="text-sm">{budgetMessage}</p>}
-              </div>
-            </div>
-          </section>
-
-          <section id="transactions" className="mt-3 scroll-mt-20 overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-[0_2px_12px_rgba(24,24,27,0.035)] md:mt-4">
-            <div className="flex flex-col gap-3 border-b border-zinc-100 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
-              <h2 className="text-[15px] font-bold">Posljednje transakcije</h2>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="flex w-full rounded-xl bg-zinc-100 p-1 sm:w-auto">
-                  {["Sve", "Prilivi", "Odlivovi"].map((filter) => (
-                    <button
-                      key={filter}
-                      onClick={() => setActiveFilter(filter)}
-                      className={cn(
-                        "h-8 flex-1 rounded-lg px-3 text-[11px] font-bold transition active:scale-[0.98] sm:flex-none",
-                        filter === activeFilter
-                          ? "bg-white text-zinc-900 shadow-sm"
-                          : "text-zinc-400",
-                      )}
-                    >
-                      {filter}
-                    </button>
-                  ))}
+                  <button
+                    type={editingBudget ? "submit" : "button"}
+                    form={editingBudget ? "budget-settings-form" : undefined}
+                    onClick={editingBudget ? undefined : (event) => { event.preventDefault(); setDraftBudget(budget); setEditingBudget(true); setBudgetMessage(""); }}
+                    disabled={budgetSaving}
+                    className={cn("min-h-12 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition disabled:opacity-60", editingBudget ? "bg-[#31724a] text-white hover:bg-[#285f3e]" : "bg-[#202124] text-white hover:bg-[#34363a]")}
+                  >
+                    {editingBudget ? (budgetSaving ? "Čuvanje..." : "✓ Sačuvaj i završi") : "+ Unos stanja i plana"}
+                  </button>
                 </div>
-                <div className="relative w-full sm:w-40">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#aaa]" size={14} />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Pretraži"
-                    className="h-11 w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 text-[16px] outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-9 sm:text-[12px]"
+                <div className="mt-4 space-y-4 md:mt-5 md:space-y-5">
+                  {([
+                    ["Kućni troškovi", budget.household, "#7e927f"],
+                    ["Lični troškovi", budget.personal, "#b9a578"],
+                  ] as const).map(([label, total, color]) => {
+                    const spent = Math.abs(transactions.filter(item => item.type === "expense" && item.category === label).reduce((sum, item) => sum + item.amount, 0));
+                    return <BudgetRow key={label} label={label} spent={spent} total={total} percent={total > 0 ? Math.min(100, spent / total * 100) : 0} color={color} />;
+                  })}
+                  <BudgetRow
+                    label="Redovni troškovi"
+                    spent={paidRegularExpensesTotal}
+                    total={allRegularExpensesTotal}
+                    percent={allRegularExpensesTotal > 0 ? Math.min(100, paidRegularExpensesTotal / allRegularExpensesTotal * 100) : 0}
+                    color="#4f7ca8"
                   />
+                  {editingBudget && (
+                    <>
+                      <form id="budget-settings-form" onSubmit={submitBudget} className="grid gap-3 border-t border-[#e7e8ea] pt-4 sm:grid-cols-2">
+                        {([
+                          ["otp", "Stanje na OTP računu"],
+                          ["nlb", "Ukupno stanje na NLB računu"],
+                          ["household", "Mjesečni limit za kućne troškove"],
+                          ["personal", "Mjesečni limit za lične troškove"],
+                          ["cash", "Trenutni iznos keša"],
+                        ] as const).map(([key, label]) => (
+                          <label key={key} className="text-sm font-bold text-[#555a60]">
+                            {label} (€)
+                            <input name={key} type="number" required min="0" max="9999999999.99" step="0.01" value={Number.isFinite(draftBudget[key]) ? draftBudget[key] : 0} onChange={(event) => setDraftBudget((current) => ({ ...current, [key]: Number(event.target.value) }))} disabled={budgetSaving} className="mt-2 h-14 w-full rounded-xl border-2 border-[#cfd3d6] px-4 text-xl font-extrabold tracking-tight outline-none focus:border-[#6f8173]" />
+                          </label>
+                        ))}
+                        <p className="rounded-lg bg-[#f4f5f7] px-3 py-3 text-xs text-[#686b70] sm:col-span-2">NLB raspoloživo se računa automatski: uneseno stanje minus 1.300 €.</p>
+                        <div className={cn("rounded-xl px-4 py-4 text-white sm:col-span-2", draftAvailableAfterPlans < 0 ? "bg-rose-700" : draftAvailableAfterPlans === 0 ? "bg-emerald-700" : "bg-blue-700")}>
+                          <p className="text-sm font-bold text-white/80">Slobodno nakon planova — pregled uživo</p>
+                          <p className="mt-1 text-2xl font-extrabold">{draftAvailableAfterPlans < 0 ? "−" : ""}{formatMoney(draftAvailableAfterPlans)} €</p>
+                        </div>
+                      </form>
+                      <div className="grid gap-3 border-t border-[#e7e8ea] pt-4 md:grid-cols-2">
+                        <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onDelete={removePlannedItem} />
+                        <PlannedItemsCard title="Očekivani troškovi" subtitle="Oduzimaju se od ukupnog stanja" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onDelete={removePlannedItem} />
+                      </div>
+                      {plannedItemMessage && <p role="alert" className="rounded-xl bg-[#f7eeee] px-4 py-3 text-sm text-[#9b3d3d]">{plannedItemMessage}</p>}
+                    </>
+                  )}
+                  {budgetMessage && <p role="status" className="text-sm">{budgetMessage}</p>}
                 </div>
               </div>
-            </div>
-            <div className="divide-y divide-[#f0f1f2]">
-              {filteredTransactions.map((transaction) => (
-                <TransactionRow key={transaction.id} transaction={transaction} deleting={deletingId === transaction.id} onDelete={() => removeTransaction(transaction)} />
-              ))}
-            </div>
-            {formError && <p role="alert" className="border-t border-[#eceeef] px-4 py-3 text-sm font-medium text-red-600 md:px-6">{formError}</p>}
-          </section>
-        </div>
+            </section>
+
+            <section id="transactions" className="mt-3 scroll-mt-20 overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-[0_2px_12px_rgba(24,24,27,0.035)] md:mt-4">
+              <div className="flex flex-col gap-3 border-b border-zinc-100 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
+                <h2 className="text-[15px] font-bold">Posljednje transakcije</h2>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="flex w-full rounded-xl bg-zinc-100 p-1 sm:w-auto">
+                    {["Sve", "Prilivi", "Odlivovi"].map((filter) => (
+                      <button
+                        key={filter}
+                        onClick={() => setActiveFilter(filter)}
+                        className={cn(
+                          "h-8 flex-1 rounded-lg px-3 text-[11px] font-bold transition active:scale-[0.98] sm:flex-none",
+                          filter === activeFilter
+                            ? "bg-white text-zinc-900 shadow-sm"
+                            : "text-zinc-400",
+                        )}
+                      >
+                        {filter}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="relative w-full sm:w-40">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#aaa]" size={14} />
+                    <input
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      placeholder="Pretraži"
+                      className="h-11 w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 text-[16px] outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-9 sm:text-[12px]"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="divide-y divide-[#f0f1f2]">
+                {filteredTransactions.map((transaction) => (
+                  <TransactionRow key={transaction.id} transaction={transaction} deleting={deletingId === transaction.id} onDelete={() => removeTransaction(transaction)} />
+                ))}
+              </div>
+              {formError && <p role="alert" className="border-t border-[#eceeef] px-4 py-3 text-sm font-medium text-red-600 md:px-6">{formError}</p>}
+            </section>
+          </div>
         ) : activeNav === "Mjesečni troškovi" ? (
           <MonthlyExpenses view="fixed" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} />
         ) : activeNav === "Pretplate" ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { addBankDeduction, deleteBankAccount, deleteBankDeduction, saveBankAccount } from "@/app/actions";
 import type { BankAccount } from "@/lib/bank";
@@ -24,7 +24,7 @@ export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setBusy(account?.id ?? "new"); setMessage("");
-    const result = await saveBankAccount({ id: account?.id, name: String(form.get("name") ?? ""), amount: Number(form.get("amount")), note: String(form.get("note") ?? "") });
+    const result = await saveBankAccount({ id: account?.id, name: String(form.get("name") ?? ""), amount: Number(form.get("amount")), note: account?.note ?? "" });
     if (result.success) {
       setAccounts((current) => account ? current.map((item) => item.id === account.id ? { ...result.account, deductions: account.deductions } : item) : [...current, result.account]);
       setAdding(false); setMessage("Sačuvano.");
@@ -64,31 +64,29 @@ export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
     <section className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
       <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-[0_2px_12px_rgba(24,24,27,0.035)] md:p-6">
         <div>
-          <div><h2 className="text-xl font-bold tracking-tight text-zinc-900">Banka</h2><p className="mt-1 text-sm leading-6 text-zinc-500">Računi, napomene i planirani odbici.</p></div>
+          <div><h2 className="text-xl font-bold tracking-tight text-zinc-900">Banka</h2><p className="mt-1 text-sm leading-6 text-zinc-500">Računi i planirani odbici.</p></div>
         </div>
 
         <div className="mt-5 space-y-4">
           {accounts.length === 0 ? <p className="rounded-xl bg-[#f5f6f7] p-5 text-sm text-[#85888d]">Još nema bankovnih stavki.</p> : accounts.map((account, index) => {
             if (index > 0) {
               return (
-                <form key={account.id} onSubmit={(event) => saveAccount(event, account)} className="grid gap-3 rounded-2xl border border-zinc-200/80 p-4 md:grid-cols-[1fr_180px_1fr_auto_auto] md:items-end">
+                <form key={account.id} onSubmit={(event) => saveAccount(event, account)} className="grid grid-cols-[minmax(58px,1fr)_82px_42px_42px] items-end gap-1.5 rounded-2xl border border-zinc-200/80 p-3 sm:grid-cols-[minmax(0,1fr)_150px_44px_44px] sm:gap-2 sm:p-4">
                   <Field label="Naziv" name="name" defaultValue={account.name} />
                   <Field label="Iznos (€)" name="amount" type="number" min="0" step="0.01" defaultValue={account.amount} />
-                  <Field label="Napomena" name="note" defaultValue={account.note} required={false} />
-                  <button disabled={busy === account.id} className="h-12 rounded-xl border border-zinc-200 px-4 text-sm font-bold text-zinc-700 transition active:scale-[0.98] disabled:opacity-50">Sačuvaj</button>
-                  <button type="button" onClick={() => removeAccount(account)} disabled={busy === account.id} aria-label={`Ukloni ${account.name}`} className="grid h-12 w-full place-items-center rounded-xl border border-zinc-200 text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-50 md:w-12"><Trash2 size={17} /></button>
+                  <SaveButton disabled={busy === account.id} label={`Sačuvaj ${account.name}`} />
+                  <button type="button" onClick={() => removeAccount(account)} disabled={busy === account.id} aria-label={`Ukloni ${account.name}`} className="grid h-11 w-10 place-items-center rounded-xl border border-zinc-200 text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-50 sm:h-12 sm:w-11"><Trash2 size={17} /></button>
                 </form>
               );
             }
             const deductions = account.deductions.reduce((sum, item) => sum + item.amount, 0);
             return (
               <article key={account.id} className="rounded-2xl border border-zinc-200/80 p-4 shadow-[0_2px_10px_rgba(24,24,27,0.025)]">
-                <form onSubmit={(event) => saveAccount(event, account)} className="grid gap-3 md:grid-cols-[1fr_180px_1fr_auto_auto] md:items-end">
+                <form onSubmit={(event) => saveAccount(event, account)} className="grid grid-cols-[minmax(58px,1fr)_82px_42px_42px] items-end gap-1.5 sm:grid-cols-[minmax(0,1fr)_150px_44px_44px] sm:gap-2">
                   <Field label="Naziv" name="name" defaultValue={account.name} />
                   <Field label="Iznos (€)" name="amount" type="number" min="0" step="0.01" defaultValue={account.amount} />
-                  <Field label="Napomena" name="note" defaultValue={account.note} required={false} />
-                  <button disabled={busy === account.id} className="h-12 rounded-xl border border-zinc-200 px-4 text-sm font-bold text-zinc-700 transition active:scale-[0.98] disabled:opacity-50">Sačuvaj</button>
-                  <button type="button" onClick={() => removeAccount(account)} disabled={busy === account.id} aria-label={`Ukloni ${account.name}`} className="grid h-12 w-full place-items-center rounded-xl border border-zinc-200 text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-50 md:w-12"><Trash2 size={17} /></button>
+                  <SaveButton disabled={busy === account.id} label={`Sačuvaj ${account.name}`} />
+                  <button type="button" onClick={() => removeAccount(account)} disabled={busy === account.id} aria-label={`Ukloni ${account.name}`} className="grid h-11 w-10 place-items-center rounded-xl border border-zinc-200 text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-50 sm:h-12 sm:w-11"><Trash2 size={17} /></button>
                 </form>
 
                 <div className="mt-4 border-t border-[#eceeef] pt-4">
@@ -120,9 +118,13 @@ export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
 }
 
 function AccountForm({ onSubmit, busy }: { onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; busy: boolean }) {
-  return <form onSubmit={onSubmit} className="mt-5 grid gap-3 rounded-2xl bg-zinc-50 p-4 md:grid-cols-[1fr_180px_1fr_auto]"><Field label="Naziv" name="name" /><Field label="Iznos (€)" name="amount" type="number" inputMode="decimal" min="0" step="0.01" /><Field label="Napomena" name="note" required={false} /><button disabled={busy} className="h-12 self-end rounded-xl bg-zinc-900 px-5 text-sm font-bold text-white transition active:scale-[0.98] disabled:opacity-50">Sačuvaj</button></form>;
+  return <form onSubmit={onSubmit} className="mt-5 grid grid-cols-[minmax(0,1fr)_82px_42px] items-end gap-1.5 rounded-2xl bg-zinc-50 p-3 sm:grid-cols-[minmax(0,1fr)_150px_44px] sm:gap-2 sm:p-4"><Field label="Naziv" name="name" /><Field label="Iznos (€)" name="amount" type="number" inputMode="decimal" min="0" step="0.01" /><SaveButton disabled={busy} label="Sačuvaj novu bankovnu stavku" primary /></form>;
 }
 
 function Field({ label, required = true, ...props }: { label: string; required?: boolean } & React.InputHTMLAttributes<HTMLInputElement>) {
-  return <label className="text-sm font-semibold text-zinc-700">{label}<input {...props} required={required} className="mt-2 h-12 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3 text-[16px] outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:text-sm" /></label>;
+  return <label className="min-w-0 overflow-hidden text-[11px] font-semibold text-zinc-700 sm:text-sm">{label}<input {...props} required={required} className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[16px] outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" /></label>;
+}
+
+function SaveButton({ disabled, label, primary = false }: { disabled: boolean; label: string; primary?: boolean }) {
+  return <button disabled={disabled} aria-label={label} title="Sačuvaj" className={`grid h-11 w-10 place-items-center rounded-xl transition active:scale-[0.98] disabled:opacity-50 sm:h-12 sm:w-11 ${primary ? "bg-zinc-900 text-white" : "border border-zinc-200 text-zinc-700"}`}><Save size={17} /></button>;
 }

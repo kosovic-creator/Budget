@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { deleteRecurringItem, payRecurringItem, saveRecurringItem } from "@/app/actions";
 import type { RecurringItem, RecurringItemKind } from "@/lib/recurring-items";
@@ -76,23 +76,21 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid }: 
         </div>
 
         {adding && (
-          <form onSubmit={(event) => save(event, view)} className="mt-5 grid gap-3 rounded-2xl bg-zinc-50 p-4 md:grid-cols-[1fr_220px_auto]">
-            <label className="text-sm font-semibold text-zinc-700">Naziv<input name="name" required maxLength={100} className="mt-2 h-12 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:text-sm" /></label>
-            <label className="text-sm font-semibold text-zinc-700">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" max="9999999999.99" step="0.01" className="mt-2 h-12 w-full rounded-xl border border-zinc-200 bg-white px-3 text-[16px] font-bold outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:text-sm" /></label>
-            <button disabled={savingId === "new"} className="h-12 self-end rounded-xl bg-zinc-900 px-5 text-sm font-bold text-white shadow-lg shadow-zinc-900/10 transition active:scale-[0.98] disabled:opacity-60">Sačuvaj</button>
+          <form onSubmit={(event) => save(event, view)} className="mt-5 grid grid-cols-[minmax(0,1fr)_82px_42px] items-end gap-1.5 rounded-2xl bg-zinc-50 p-3 sm:grid-cols-[minmax(0,1fr)_140px_44px] sm:gap-3 sm:p-4">
+            <label className="min-w-0 text-xs font-semibold text-zinc-700 sm:text-sm">Naziv<input name="name" required maxLength={100} className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" /></label>
+            <label className="min-w-0 text-xs font-semibold text-zinc-700 sm:text-sm">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" max="9999999999.99" step="0.01" className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[16px] font-bold outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" /></label>
+            <button disabled={savingId === "new"} aria-label="Sačuvaj novu stavku" title="Sačuvaj" className="grid h-11 w-10 place-items-center rounded-xl bg-zinc-900 text-white shadow-lg shadow-zinc-900/10 transition active:scale-[0.98] disabled:opacity-60 sm:h-12 sm:w-11"><Save size={18} /></button>
           </form>
         )}
 
         <div className="mt-5 space-y-3">
           {visibleItems.length === 0 ? <p className="rounded-2xl bg-zinc-50 p-5 text-sm text-zinc-500">Još nema unesenih stavki.</p> : visibleItems.map((item) => (
-            <form key={item.id} onSubmit={(event) => save(event, item.kind, item.id)} className="grid gap-3 rounded-2xl border border-zinc-200/80 p-4 md:grid-cols-[1fr_220px_auto_auto] md:items-end">
-              <label className="text-sm font-semibold text-zinc-700">Naziv<input name="name" required defaultValue={item.name} className="mt-2 h-12 w-full rounded-xl border border-zinc-200 px-3 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:text-sm" /></label>
-              <label className="text-sm font-semibold text-zinc-700">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" step="0.01" defaultValue={item.amount} className="mt-2 h-12 w-full rounded-xl border border-zinc-200 px-3 text-[16px] font-bold outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:text-sm" /></label>
-              <button disabled={savingId === item.id} className="h-12 rounded-xl border border-zinc-200 px-4 text-sm font-bold text-zinc-700 transition active:scale-[0.98] disabled:opacity-60">Sačuvaj</button>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => pay(item)} disabled={savingId === item.id || item.paid} className="h-12 rounded-xl bg-zinc-900 px-4 text-sm font-bold text-white transition active:scale-[0.98] disabled:bg-emerald-50 disabled:text-emerald-700 disabled:opacity-100">{item.paid ? "Plaćeno" : "Plati"}</button>
-                <button type="button" onClick={() => remove(item)} disabled={savingId === item.id} aria-label={`Ukloni ${item.name}`} className="grid h-12 w-12 place-items-center rounded-xl border border-zinc-200 text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-60"><Trash2 size={17} /></button>
-              </div>
+            <form key={item.id} onSubmit={(event) => save(event, item.kind, item.id)} className="grid grid-cols-[minmax(52px,1fr)_68px_40px_54px_40px] items-end gap-1 rounded-2xl border border-zinc-200/80 p-2 sm:grid-cols-[minmax(0,1fr)_140px_44px_76px_44px] sm:gap-2 sm:p-4">
+              <label className="min-w-0 overflow-hidden text-[11px] font-semibold text-zinc-700 sm:text-sm">Naziv<input name="name" required defaultValue={item.name} className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-2 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" /></label>
+              <label className="min-w-0 overflow-hidden text-[11px] font-semibold text-zinc-700 sm:text-sm">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" step="0.01" defaultValue={item.amount} className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-1.5 text-[16px] font-bold outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" /></label>
+              <button disabled={savingId === item.id} aria-label={`Sačuvaj ${item.name}`} title="Sačuvaj" className="grid h-11 w-10 place-items-center rounded-xl border border-zinc-200 text-zinc-700 transition active:scale-[0.98] disabled:opacity-60 sm:h-12 sm:w-11"><Save size={17} /></button>
+              <button type="button" onClick={() => pay(item)} disabled={savingId === item.id || item.paid} className="h-11 min-w-0 rounded-xl bg-zinc-900 px-1 text-[11px] font-bold text-white transition active:scale-[0.98] disabled:bg-emerald-50 disabled:text-emerald-700 disabled:opacity-100 sm:h-12 sm:px-2 sm:text-xs">{item.paid ? "Plaćeno" : "Plati"}</button>
+              <button type="button" onClick={() => remove(item)} disabled={savingId === item.id} aria-label={`Ukloni ${item.name}`} className="grid h-11 w-10 place-items-center rounded-xl border border-zinc-200 text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-60 sm:h-12 sm:w-11"><Trash2 size={17} /></button>
             </form>
           ))}
         </div>
