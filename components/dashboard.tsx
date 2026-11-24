@@ -76,6 +76,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const { confirmRemoval, confirmation } = useConfirmation();
   const [draftBudget, setDraftBudget] = useState(initialBudget);
   const [editingBudget, setEditingBudget] = useState(false);
+  const [cashTransferOpen, setCashTransferOpen] = useState(false);
   const [budgetSaving, setBudgetSaving] = useState(false);
   const [budgetMessage, setBudgetMessage] = useState("");
   const [securityMessage, setSecurityMessage] = useState("");
@@ -116,10 +117,46 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
     setBudgetSaving(true); setBudgetMessage("");
     try {
       const result = await saveBudget(next);
-      if (result.success) { setBudget(next); setEditingBudget(false); setBudgetMessage("Stanje i plan su sačuvani."); }
+      if (result.success) { setBudget(next); setEditingBudget(false); setCashTransferOpen(false); setBudgetMessage("Stanje i plan su sačuvani."); }
       else setBudgetMessage(result.message);
     } catch { setBudgetMessage("Podaci nijesu sačuvani. Pokušajte ponovo."); }
     finally { setBudgetSaving(false); }
+  }
+
+  const maxCashTransfer = Math.max(0, Math.min(
+    Math.round(draftBudget.cash * 100),
+    999_999_999_999 - Math.round(draftBudget.otp * 100),
+  )) / 100;
+
+  async function transferCashToOtp(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (budgetSaving) return;
+    const amount = Number(new FormData(event.currentTarget).get("transferAmount"));
+    if (!Number.isFinite(amount) || amount < 0.01 || amount > maxCashTransfer) return;
+
+    const cents = Math.round(amount * 100);
+    const next = {
+      ...draftBudget,
+      cash: (Math.round(draftBudget.cash * 100) - cents) / 100,
+      otp: (Math.round(draftBudget.otp * 100) + cents) / 100,
+    };
+    setBudgetSaving(true);
+    setBudgetMessage("");
+    try {
+      const result = await saveBudget(next);
+      if (!result.success) {
+        setBudgetMessage(result.message);
+        return;
+      }
+      setBudget(next);
+      setDraftBudget(next);
+      setCashTransferOpen(false);
+      setBudgetMessage("Prenos na OTP je sačuvan.");
+    } catch {
+      setBudgetMessage("Prenos nije sačuvan. Pokušajte ponovo.");
+    } finally {
+      setBudgetSaving(false);
+    }
   }
   const [transactions, setTransactions] = useState(initialTransactions);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -168,9 +205,13 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   }, 0) / 100;
   const deductions = { otp: householdSpent + personalSpent - incomeTotal, household: householdSpent, personal: personalSpent, nlb: 0, cash: 0 };
   const otpBalance = budget.otp - deductions.otp;
-  const totalBalance = otpBalance + nlbAvailable + budget.cash + additionsTotal;
+  function balanceAfterPayments(settings: BudgetSettings) {
+    return settings.otp - deductions.otp + (settings.nlb - 1300) + settings.cash
+      + additionsTotal - paidRegularExpensesTotal;
+  }
+  const totalBalance = balanceAfterPayments(budget);
   function afterPlans(settings: BudgetSettings) {
-    const balance = settings.otp - deductions.otp + settings.nlb - 1300 + settings.cash + additionsTotal;
+    const balance = balanceAfterPayments(settings);
     return Math.round((balance - expectedExpensesTotal - monthlyExpensesTotal
       - (settings.household - householdSpent) - (settings.personal - personalSpent)) * 100) / 100;
   }
@@ -310,7 +351,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         <nav className="mt-3 flex-1 space-y-1 px-4">
           {[
             { label: "Pregled", icon: LayoutGrid },
-            { label: "Mjesečni troškovi", icon: Target },
+            { label: "Redovni troškovi", icon: Target },
             { label: "Pretplate", icon: CreditCard },
             { label: "Banka", icon: Landmark },
           ].map((item) => (
@@ -373,7 +414,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         {activeNav === "Pregled" ? (
           <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
             <section id="overview" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
-              <SummaryCard featured title="Ukupno stanje" value={`${totalBalance < 0 ? "−" : ""}${formatMoney(totalBalance)} €`} icon={<WalletCards size={18} />} tone="dark" trend="OTP + NLB + keš + dodaci" />
+              <SummaryCard featured title="Ukupno stanje" value={`${totalBalance < 0 ? "−" : ""}${formatMoney(totalBalance)} €`} icon={<WalletCards size={18} />} tone="dark" trend="OTP + NLB + keš + dodaci − plaćeni redovni troškovi" />
               <SummaryCard title="OTP kartica" value={`${otpBalance < 0 ? "−" : ""}${formatMoney(otpBalance)} €`} icon={<Landmark size={18} />} trend="Stanje na računu" />
               <SummaryCard title="NLB kartica" value={`${nlbAvailable < 0 ? "−" : ""}${formatMoney(nlbAvailable)} €`} icon={<Landmark size={18} />} trend="NLB − 1.300 €" />
               <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<WalletCards size={18} />} trend="Gotovina" />
@@ -425,20 +466,42 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                           ["personal", "Mjesečni limit za lične troškove"],
                           ["cash", "Trenutni iznos keša"],
                         ] as const).map(([key, label]) => (
-                          <label key={key} className="text-sm font-bold text-[#555a60]">
+                          <div key={key} className="flex items-end gap-2">
+                          <label className="min-w-0 flex-1 text-sm font-bold text-[#555a60]">
                             {label} (€)
                             <input name={key} type="number" required min={-deductions[key]} max={9999999999.99 - deductions[key]} step="0.01" value={Math.round((draftBudget[key] - deductions[key]) * 100) / 100} onChange={(event) => {
                               const amount = Number(event.target.value);
                               setDraftBudget((current) => ({ ...current, [key]: Math.round((amount + deductions[key]) * 100) / 100 }));
                             }} disabled={budgetSaving} className="mt-2 h-14 w-full rounded-xl border-2 border-[#cfd3d6] px-4 text-xl font-extrabold tracking-tight outline-none focus:border-[#6f8173]" />
                           </label>
+                          {key === "cash" && (
+                            <button type="button" aria-label="Prenesi keš na OTP račun" aria-expanded={cashTransferOpen}
+                              disabled={budgetSaving || maxCashTransfer === 0}
+                              onClick={() => setCashTransferOpen((open) => !open)}
+                              className="h-14 shrink-0 rounded-xl bg-zinc-900 px-4 text-sm font-bold text-white disabled:opacity-50">
+                              OTP
+                            </button>
+                          )}
+                          </div>
                         ))}
+                        {cashTransferOpen && (
+                          <div className="grid gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 grid-cols-2 xl:grid-cols-[minmax(0,1fr)_auto_auto] xl:items-end">
+                            <label className="col-span-2 min-w-0 text-sm font-bold text-zinc-700 xl:col-span-1">
+                              Iznos prenosa na OTP (€)
+                              <input form="cash-transfer-form" name="transferAmount" type="number" inputMode="decimal" required min="0.01" max={maxCashTransfer} step="0.01" disabled={budgetSaving}
+                                className="mt-1 block h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-base" />
+                            </label>
+                            <button type="button" disabled={budgetSaving} onClick={() => setCashTransferOpen(false)} className="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm font-semibold">Otkaži</button>
+                            <button form="cash-transfer-form" type="submit" disabled={budgetSaving || maxCashTransfer === 0} className="min-h-11 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">{budgetSaving ? "Čuvanje…" : "Prenesi"}</button>
+                          </div>
+                        )}
                         <p className="rounded-lg bg-[#f4f5f7] px-3 py-3 text-xs text-[#686b70] sm:col-span-2">NLB raspoloživo se računa automatski: uneseno stanje minus 1.300 €.</p>
                         <div className={cn("rounded-xl px-4 py-4 text-white sm:col-span-2", draftAvailableAfterPlans < 0 ? "bg-rose-700" : draftAvailableAfterPlans === 0 ? "bg-emerald-700" : "bg-blue-700")}>
                           <p className="text-sm font-bold text-white/80">Slobodno nakon planova — pregled uživo</p>
                           <p className="mt-1 text-2xl font-extrabold">{draftAvailableAfterPlans < 0 ? "−" : ""}{formatMoney(draftAvailableAfterPlans)} €</p>
                         </div>
                       </form>
+                      <form id="cash-transfer-form" onSubmit={transferCashToOtp} />
                       <div className="grid gap-3 border-t border-[#e7e8ea] pt-4 md:grid-cols-2">
                         <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} />
                         <PlannedItemsCard title="Očekivani troškovi" subtitle="Umanjuju izabrani mjesečni limit" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} />
@@ -497,8 +560,8 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
               {formError && <p role="alert" className="border-t border-[#eceeef] px-4 py-3 text-sm font-medium text-red-600 md:px-6">{formError}</p>}
             </section>
           </div>
-        ) : activeNav === "Mjesečni troškovi" ? (
-          <MonthlyExpenses view="fixed" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} />
+        ) : activeNav === "Redovni troškovi" ? (
+          <MonthlyExpenses view="fixed" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} onPaymentReset={(id) => setTransactions((current) => current.filter((transaction) => transaction.id !== id))} />
         ) : activeNav === "Pretplate" ? (
           <MonthlyExpenses view="subscription" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} />
         ) : (
@@ -509,7 +572,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
       <nav aria-label="Glavna navigacija" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-zinc-200/80 bg-white/85 px-1 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(24,24,27,0.05)] backdrop-blur-xl lg:hidden">
         {[
           { label: "Pregled", icon: Home },
-          { label: "Mjesečni troškovi", icon: Target },
+          { label: "Redovni troškovi", icon: Target },
           { label: "Pretplate", icon: CreditCard },
           { label: "Banka", icon: Landmark },
         ].map((item) => (
@@ -523,7 +586,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
           >
             {activeNav === item.label && <span className="absolute top-0 h-1 w-8 rounded-full bg-emerald-600" />}
             <item.icon size={20} strokeWidth={activeNav === item.label ? 2.4 : 1.8} />
-            {item.label === "Mjesečni troškovi" ? "Troškovi" : item.label}
+            {item.label}
           </button>
         ))}
       </nav>

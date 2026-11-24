@@ -236,13 +236,38 @@ export async function payRecurringItem(id: string) {
     const currentCycle = getBudgetCycle();
     if (item.paidCycle === currentCycle) return { success: false as const, message: "Ovaj trošak je već plaćen u tekućem periodu." };
     const [transaction] = await prisma.$transaction([
-      prisma.transaction.create({ data: { title: item.name, amount: item.amount, type: "EXPENSE", category: "REGULAR" } }),
+      prisma.transaction.create({ data: { id: recurringPaymentId(id, currentCycle), title: item.name, amount: item.amount, type: "EXPENSE", category: "REGULAR" } }),
       prisma.recurringItem.update({ where: { id }, data: { paid: true, paidCycle: currentCycle } }),
     ]);
     return { success: true as const, itemId: item.id, transaction: serializeTransaction(transaction) };
   } catch (error) {
     console.error("Neuspješno evidentiranje plaćanja.", error);
     return { success: false as const, message: "Plaćanje nije evidentirano." };
+  }
+}
+
+function recurringPaymentId(id: string, cycle: string) {
+  return `recurring-payment:${id}:${cycle}`;
+}
+
+export async function resetRecurringPayment(id: string) {
+  if (!(await auth.api.getSession({ headers: await headers() }))) {
+    return { success: false as const, message: "Sesija je istekla." };
+  }
+  const cycle = getBudgetCycle();
+  const transactionId = recurringPaymentId(id, cycle);
+  try {
+    const removed = await prisma.$transaction(async (tx) => {
+      await tx.recurringItem.update({
+        where: { id, kind: "FIXED", paidCycle: cycle },
+        data: { paid: false, paidCycle: null },
+      });
+      return tx.transaction.deleteMany({ where: { id: transactionId } });
+    });
+    return { success: true as const, transactionId, removedTransaction: removed.count > 0 };
+  } catch (error) {
+    console.error("Neuspješno poništavanje plaćanja.", error);
+    return { success: false as const, message: "Plaćanje nije poništeno. Osvježite stranicu i pokušajte ponovo." };
   }
 }
 
