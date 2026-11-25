@@ -7,6 +7,7 @@ import {
   Home,
   Landmark,
   KeyRound,
+  Fingerprint,
   LayoutGrid,
   Plus,
   Save,
@@ -75,11 +76,34 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const [budget, setBudget] = useState(initialBudget);
   const [bankAccounts, setBankAccounts] = useState(initialBankAccounts);
   const passwordDialog = useRef<HTMLDialogElement>(null);
+  const [passkeySaving, setPasskeySaving] = useState(false);
+  const [passkeyFeedback, setPasskeyFeedback] = useState("");
+
+  async function enablePasskey() {
+    if (passkeySaving) return;
+    if (!window.isSecureContext || !("PublicKeyCredential" in window)) {
+      setPasskeyFeedback("Otvorite Budžet preko HTTPS-a u Safariju da podesite Face ID.");
+      return;
+    }
+    setPasskeySaving(true);
+    setPasskeyFeedback("");
+    try {
+      const result = await authClient.passkey.addPasskey({ name: "Budžet", authenticatorAttachment: "platform" });
+      setPasskeyFeedback(result.error
+        ? "Passkey nije sačuvan. Pokušajte ponovo i potvrdite zahtjev uređaja."
+        : "Passkey je sačuvan. Možete ga koristiti pri sljedećoj prijavi.");
+    } catch {
+      setPasskeyFeedback("Podešavanje passkeya nije dovršeno.");
+    } finally {
+      setPasskeySaving(false);
+    }
+  }
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordFeedback, setPasswordFeedback] = useState<{ error: boolean; message: string } | null>(null);
 
   function openPasswordDialog() {
     setPasswordFeedback(null);
+    setPasskeyFeedback("");
     passwordDialog.current?.showModal();
   }
 
@@ -639,10 +663,14 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
       </nav>
 
       <dialog ref={passwordDialog} aria-labelledby="password-dialog-title"
-        onCancel={(event) => { if (passwordSaving) event.preventDefault(); }}
+        onCancel={(event) => { if (passwordSaving || passkeySaving) event.preventDefault(); }}
         onClose={() => passwordDialog.current?.querySelector("form")?.reset()}
         className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-sm overflow-y-auto rounded-2xl bg-white p-5 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/45">
-        <h2 id="password-dialog-title" className="text-lg font-bold">Promijeni lozinku</h2>
+        <h2 id="password-dialog-title" className="text-lg font-bold">Prijava i lozinka</h2>
+        <button type="button" onClick={enablePasskey} disabled={passkeySaving || passwordSaving} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 px-3 text-sm font-semibold disabled:opacity-50">
+          <Fingerprint size={18} aria-hidden /> {passkeySaving ? "Čekanje potvrde…" : "Uključi Face ID / passkey"}
+        </button>
+        {passkeyFeedback && <p role="status" className="mt-2 text-sm text-zinc-700">{passkeyFeedback}</p>}
         <form onSubmit={changePassword} className="mt-4 space-y-3">
           {([
             ["currentPassword", "Sadašnja lozinka", "current-password"],
@@ -658,8 +686,8 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
           ))}
           {passwordFeedback && <p role={passwordFeedback.error ? "alert" : "status"} className={passwordFeedback.error ? "text-sm text-rose-700" : "text-sm text-emerald-700"}>{passwordFeedback.message}</p>}
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" disabled={passwordSaving} onClick={() => passwordDialog.current?.close()} className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm">Zatvori</button>
-            <button type="submit" disabled={passwordSaving} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white disabled:opacity-50">
+            <button type="button" disabled={passwordSaving || passkeySaving} onClick={() => passwordDialog.current?.close()} className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm">Zatvori</button>
+            <button type="submit" disabled={passwordSaving || passkeySaving} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white disabled:opacity-50">
               {passwordSaving ? "Čuvanje…" : "Sačuvaj"}
             </button>
           </div>

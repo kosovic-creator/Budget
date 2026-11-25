@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheck, WalletCards } from "lucide-react";
+import { Fingerprint, ShieldCheck, WalletCards } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
@@ -62,6 +62,28 @@ export default function SignInForm({ setupRequired }: SignInFormProps) {
     router.refresh();
   }
 
+  async function signInWithPasskey() {
+    if (!window.isSecureContext || !("PublicKeyCredential" in window)) {
+      setMessage("Za prijavu pomoću Face ID-a otvorite Budžet preko HTTPS-a u Safariju.");
+      return;
+    }
+    setIsPending(true);
+    setMessage("");
+    try {
+      const result = await authClient.signIn.passkey();
+      if (result.error) {
+        setMessage("Prijava passkeyem nije uspjela. Ako ga još nemate, prijavite se lozinkom i uključite Face ID u Budžetu.");
+        return;
+      }
+      router.replace("/");
+      router.refresh();
+    } catch {
+      setMessage("Prijava passkeyem nije dovršena. Pokušajte ponovo ili se prijavite lozinkom.");
+    } finally {
+      setIsPending(false);
+    }
+  }
+
   return (
     <main className="grid min-h-screen place-items-center bg-[#f6f7f8] px-4 py-8 text-zinc-900">
       <div className="w-full max-w-[420px] rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_14px_40px_rgba(24,24,27,0.08)] sm:p-8">
@@ -91,6 +113,11 @@ export default function SignInForm({ setupRequired }: SignInFormProps) {
           </form>
         )}
 
+        {!setupRequired && (
+          <button type="button" onClick={signInWithPasskey} disabled={isPending} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-3 text-sm font-bold text-white disabled:opacity-60">
+            <Fingerprint size={19} aria-hidden /> Prijavi se pomoću Face ID-a / passkeya
+          </button>
+        )}
         {message && <p role="alert" className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800">{message}</p>}
       </div>
     </main>
