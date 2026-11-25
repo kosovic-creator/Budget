@@ -22,6 +22,7 @@ import {
 import { useMemo, useRef, useState } from "react";
 import { useConfirmation } from "@/components/confirmation-dialog";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
 import { createPlannedItem, createTransaction, deletePlannedItem, deleteTransaction, saveBudget, updatePlannedItem } from "@/app/actions";
@@ -67,15 +68,60 @@ interface DashboardProps {
   initialRecurringItems: RecurringItem[];
   initialBankAccounts: BankAccount[];
   userName: string;
+  userImage?: string | null;
 }
 
-export default function Dashboard({ initialTransactions, initialBudget, initialPlannedItems, initialRecurringItems, initialBankAccounts, userName }: DashboardProps) {
+export default function Dashboard({ initialTransactions, initialBudget, initialPlannedItems, initialRecurringItems, initialBankAccounts, userName, userImage }: DashboardProps) {
   const router = useRouter();
   const currentPeriod = new Intl.DateTimeFormat("sr-Latn-ME", { month: "long", year: "numeric" }).format(new Date());
   const userInitials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((name) => name[0]).join("").toUpperCase() || "JA";
   const [budget, setBudget] = useState(initialBudget);
   const [bankAccounts, setBankAccounts] = useState(initialBankAccounts);
   const passwordDialog = useRef<HTMLDialogElement>(null);
+  const [profileImage, setProfileImage] = useState(userImage ?? "");
+  const [imageSaving, setImageSaving] = useState(false);
+  const [imageMessage, setImageMessage] = useState("");
+
+  async function uploadProfileImage(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file || imageSaving) return;
+    if (!file.type.startsWith("image/") || file.size > 20 * 1024 * 1024) {
+      setImageMessage("Izaberite sliku veličine do 20 MB.");
+      return;
+    }
+
+    setImageSaving(true);
+    setImageMessage("");
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new window.Image();
+      image.src = url;
+      await image.decode();
+      const side = Math.min(image.naturalWidth, image.naturalHeight);
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 192;
+      const context = canvas.getContext("2d");
+      if (!context || !side) throw new Error("Image could not be rendered");
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, 192, 192);
+      context.drawImage(image, (image.naturalWidth - side) / 2, (image.naturalHeight - side) / 2, side, side, 0, 0, 192, 192);
+      const imageData = canvas.toDataURL("image/jpeg", 0.82);
+      const result = await authClient.updateUser({ image: imageData });
+      if (result.error) throw new Error("Profile update failed");
+      setProfileImage(imageData);
+      setImageMessage("Profilna slika je sačuvana.");
+    } catch {
+      setImageMessage("Slika nije sačuvana. Pokušajte s fotografijom u JPG ili PNG formatu.");
+    } finally {
+      URL.revokeObjectURL(url);
+      setImageSaving(false);
+    }
+  }
+
+  const avatar = profileImage?.startsWith("data:image/jpeg;base64,")
+    ? <Image src={profileImage} alt="" width={192} height={192} unoptimized className="size-full rounded-full object-cover" />
+    : userInitials;
   const [passkeySaving, setPasskeySaving] = useState(false);
   const [passkeyFeedback, setPasskeyFeedback] = useState("");
 
@@ -449,11 +495,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
 
         <div className="px-4 pb-5">
           <div className="mt-4 flex items-center gap-3 border-t border-zinc-100 px-2 pt-5">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-900">{userInitials}</div>
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-900">{avatar}</div>
             <div className="min-w-0">
               <p className="truncate text-[13px] font-semibold">{userName}</p>
               <button type="button" onClick={openPasswordDialog} className="mt-1 flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-900">
-                <KeyRound size={12} aria-hidden /> Promijeni lozinku
+                Profil
               </button>
               <button onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => { router.replace("/sign-in"); router.refresh(); } } })} className="mt-0.5 flex items-center gap-1 text-[11px] text-[#9b9da1] hover:text-[#555]">
                 <LogOut size={11} /> Odjavi se
@@ -471,11 +517,8 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
             <h1 className="text-[19px] font-bold tracking-tight text-zinc-900 md:text-[21px]">{activeNav}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={openPasswordDialog} aria-label="Promijeni lozinku" title="Promijeni lozinku" className="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 lg:hidden">
-              <KeyRound size={17} aria-hidden />
-            </button>
-            <button onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => { router.replace("/sign-in"); router.refresh(); } } })} aria-label="Odjavi se" title={`Odjavi se (${userName})`} className="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition active:scale-95 lg:hidden">
-              <span className="text-[11px] font-bold">{userInitials}</span>
+            <button type="button" onClick={openPasswordDialog} aria-label="Otvori profil" aria-haspopup="dialog" title="Profil" className="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition active:scale-95 lg:hidden">
+              <span className="grid size-full place-items-center text-[11px] font-bold">{avatar}</span>
             </button>
             <button
               onClick={() => { setNewTransactionType("expense"); setTransactionTitle(""); setTitleSuggestionsOpen(false); setFormError(""); setIsModalOpen(true); }}
@@ -705,12 +748,24 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         onCancel={(event) => { if (passwordSaving || passkeySaving) event.preventDefault(); }}
         onClose={() => passwordDialog.current?.querySelector("form")?.reset()}
         className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-sm overflow-y-auto rounded-2xl bg-white p-5 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/45">
-        <h2 id="password-dialog-title" className="text-lg font-bold">Prijava i lozinka</h2>
+        <h2 id="password-dialog-title" className="text-lg font-bold">Profil</h2>
+        <div className="mt-3 flex items-center gap-3">
+          <div className="grid size-14 shrink-0 place-items-center rounded-full bg-emerald-100 font-bold text-emerald-900">{avatar}</div>
+          <div className="min-w-0 flex-1">
+            <p className="break-words text-sm font-medium text-zinc-700">{userName}</p>
+            <label className="mt-1 inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-zinc-300 px-3 text-sm font-semibold focus-within:ring-2 focus-within:ring-emerald-600">
+              {imageSaving ? "Čuvanje…" : profileImage ? "Promijeni sliku" : "Dodaj sliku"}
+              <input type="file" accept="image/*" className="sr-only" disabled={imageSaving || passwordSaving || passkeySaving} onChange={uploadProfileImage} />
+            </label>
+          </div>
+        </div>
+        {imageMessage && <p role="status" className="mt-2 text-sm text-zinc-700">{imageMessage}</p>}
         <button type="button" onClick={enablePasskey} disabled={passkeySaving || passwordSaving} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-zinc-300 px-3 text-sm font-semibold disabled:opacity-50">
           <Fingerprint size={18} aria-hidden /> {passkeySaving ? "Čekanje potvrde…" : "Uključi Face ID / passkey"}
         </button>
         {passkeyFeedback && <p role="status" className="mt-2 text-sm text-zinc-700">{passkeyFeedback}</p>}
         <form onSubmit={changePassword} className="mt-4 space-y-3">
+          <h3 className="flex items-center gap-2 text-sm font-bold"><KeyRound size={16} aria-hidden /> Promijeni lozinku</h3>
           {([
             ["currentPassword", "Sadašnja lozinka", "current-password"],
             ["newPassword", "Nova lozinka (najmanje 10 znakova)", "new-password"],
@@ -731,6 +786,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
             </button>
           </div>
         </form>
+        <button type="button" disabled={passwordSaving || passkeySaving}
+          onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => { router.replace("/sign-in"); router.refresh(); } } })}
+          className="mt-4 flex min-h-11 w-full items-center gap-2 border-t border-zinc-200 pt-2 text-sm font-semibold text-zinc-600 hover:text-zinc-900 disabled:opacity-50">
+          <LogOut size={16} aria-hidden /> Odjavi se
+        </button>
       </dialog>
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end bg-zinc-950/35 px-0 backdrop-blur-[2px] sm:items-center sm:px-4" role="dialog" aria-modal="true">

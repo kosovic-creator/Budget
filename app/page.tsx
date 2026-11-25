@@ -27,7 +27,7 @@ async function DatabaseDashboard() {
   if (!session) redirect("/sign-in");
 
   const { transactions, budget, plannedItems, recurringItems, bankAccounts } = await loadDashboardData();
-  return <Dashboard initialTransactions={transactions} initialBudget={budget} initialPlannedItems={plannedItems} initialRecurringItems={recurringItems} initialBankAccounts={bankAccounts} userName={session.user.name} />;
+  return <Dashboard initialTransactions={transactions} initialBudget={budget} initialPlannedItems={plannedItems} initialRecurringItems={recurringItems} initialBankAccounts={bankAccounts} userName={session.user.name} userImage={session.user.image} />;
 }
 
 async function loadDashboardData() {
