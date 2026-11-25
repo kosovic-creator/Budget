@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Home,
   Landmark,
+  KeyRound,
   LayoutGrid,
   Plus,
   Save,
@@ -17,7 +18,7 @@ import {
   Trash2,
   CreditCard,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useConfirmation } from "@/components/confirmation-dialog";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
@@ -72,6 +73,44 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const currentPeriod = new Intl.DateTimeFormat("sr-Latn-ME", { month: "long", year: "numeric" }).format(new Date());
   const userInitials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((name) => name[0]).join("").toUpperCase() || "JA";
   const [budget, setBudget] = useState(initialBudget);
+  const passwordDialog = useRef<HTMLDialogElement>(null);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordFeedback, setPasswordFeedback] = useState<{ error: boolean; message: string } | null>(null);
+
+  function openPasswordDialog() {
+    setPasswordFeedback(null);
+    passwordDialog.current?.showModal();
+  }
+
+  async function changePassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (passwordSaving) return;
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const currentPassword = String(data.get("currentPassword") ?? "");
+    const newPassword = String(data.get("newPassword") ?? "");
+    if (newPassword !== data.get("confirmPassword")) {
+      setPasswordFeedback({ error: true, message: "Nova lozinka i potvrda se ne poklapaju." });
+      return;
+    }
+    setPasswordSaving(true);
+    setPasswordFeedback(null);
+    try {
+      const { error } = await authClient.changePassword({ currentPassword, newPassword, revokeOtherSessions: true });
+      if (error) {
+        setPasswordFeedback({ error: true, message: error.code === "INVALID_PASSWORD"
+          ? "Sadašnja lozinka nije ispravna."
+          : "Lozinka nije promijenjena. Provjerite unos i pokušajte ponovo." });
+        return;
+      }
+      form.reset();
+      setPasswordFeedback({ error: false, message: "Lozinka je promijenjena." });
+    } catch {
+      setPasswordFeedback({ error: true, message: "Nije moguće potvrditi promjenu lozinke. Pokušajte ponovo." });
+    } finally {
+      setPasswordSaving(false);
+    }
+  }
   const { confirmRemoval, confirmation } = useConfirmation();
   const [draftBudget, setDraftBudget] = useState(initialBudget);
   const [editingBudget, setEditingBudget] = useState(false);
@@ -371,6 +410,9 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
             <div className="grid h-9 w-9 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-900">{userInitials}</div>
             <div className="min-w-0">
               <p className="truncate text-[13px] font-semibold">{userName}</p>
+              <button type="button" onClick={openPasswordDialog} className="mt-1 flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-900">
+                <KeyRound size={12} aria-hidden /> Promijeni lozinku
+              </button>
               <button onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => { router.replace("/sign-in"); router.refresh(); } } })} className="mt-0.5 flex items-center gap-1 text-[11px] text-[#9b9da1] hover:text-[#555]">
                 <LogOut size={11} /> Odjavi se
               </button>
@@ -387,6 +429,9 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
             <h1 className="text-[19px] font-bold tracking-tight text-zinc-900 md:text-[21px]">{activeNav}</h1>
           </div>
           <div className="flex items-center gap-2">
+            <button type="button" onClick={openPasswordDialog} aria-label="Promijeni lozinku" title="Promijeni lozinku" className="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 lg:hidden">
+              <KeyRound size={17} aria-hidden />
+            </button>
             <button onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => { router.replace("/sign-in"); router.refresh(); } } })} aria-label="Odjavi se" title={`Odjavi se (${userName})`} className="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition active:scale-95 lg:hidden">
               <span className="text-[11px] font-bold">{userInitials}</span>
             </button>
@@ -580,6 +625,33 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         ))}
       </nav>
 
+      <dialog ref={passwordDialog} aria-labelledby="password-dialog-title"
+        onCancel={(event) => { if (passwordSaving) event.preventDefault(); }}
+        onClose={() => passwordDialog.current?.querySelector("form")?.reset()}
+        className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-sm overflow-y-auto rounded-2xl bg-white p-5 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/45">
+        <h2 id="password-dialog-title" className="text-lg font-bold">Promijeni lozinku</h2>
+        <form onSubmit={changePassword} className="mt-4 space-y-3">
+          {([
+            ["currentPassword", "Sadašnja lozinka", "current-password"],
+            ["newPassword", "Nova lozinka (najmanje 10 znakova)", "new-password"],
+            ["confirmPassword", "Ponovite novu lozinku", "new-password"],
+          ] as const).map(([name, label, autoComplete]) => (
+            <label key={name} className="block text-sm font-medium">
+              {label}
+              <input name={name} type="password" required autoComplete={autoComplete}
+                minLength={name === "currentPassword" ? undefined : 10} disabled={passwordSaving}
+                className="mt-1 block h-11 w-full rounded-lg border border-zinc-300 px-3 text-base" />
+            </label>
+          ))}
+          {passwordFeedback && <p role={passwordFeedback.error ? "alert" : "status"} className={passwordFeedback.error ? "text-sm text-rose-700" : "text-sm text-emerald-700"}>{passwordFeedback.message}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" disabled={passwordSaving} onClick={() => passwordDialog.current?.close()} className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm">Zatvori</button>
+            <button type="submit" disabled={passwordSaving} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white disabled:opacity-50">
+              {passwordSaving ? "Čuvanje…" : "Sačuvaj"}
+            </button>
+          </div>
+        </form>
+      </dialog>
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end bg-zinc-950/35 px-0 backdrop-blur-[2px] sm:items-center sm:px-4" role="dialog" aria-modal="true">
           <form onSubmit={addTransaction} className="max-h-[calc(100dvh-12px)] w-full overflow-y-auto rounded-t-[28px] border border-white/70 bg-white px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-3 shadow-2xl sm:max-w-md sm:rounded-3xl sm:p-6">
