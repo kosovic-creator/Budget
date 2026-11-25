@@ -4,7 +4,6 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ChevronRight,
-  Fingerprint,
   Home,
   Landmark,
   LayoutGrid,
@@ -79,27 +78,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const [cashTransferOpen, setCashTransferOpen] = useState(false);
   const [budgetSaving, setBudgetSaving] = useState(false);
   const [budgetMessage, setBudgetMessage] = useState("");
-  const [securityMessage, setSecurityMessage] = useState("");
-  const [isAddingPasskey, setIsAddingPasskey] = useState(false);
-
-  async function addPasskey() {
-    setIsAddingPasskey(true);
-    setSecurityMessage("");
-
-    if (!("PublicKeyCredential" in window)) {
-      setSecurityMessage("Ovaj preglednik ne podržava Face ID/passkey.");
-      setIsAddingPasskey(false);
-      return;
-    }
-
-    const result = await authClient.passkey.addPasskey({
-      name: /iPhone|iPad|iPod/i.test(navigator.userAgent) ? "iPhone Face ID" : "Passkey ovog uređaja",
-      authenticatorAttachment: "platform",
-    });
-
-    setSecurityMessage(result.error ? (result.error.message ?? "Zaštita uređaja nije dodata.") : "Ovaj uređaj je uspješno dodat za sigurnu prijavu.");
-    setIsAddingPasskey(false);
-  }
 
   async function submitBudget(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -409,9 +387,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
             <h1 className="text-[19px] font-bold tracking-tight text-zinc-900 md:text-[21px]">{activeNav}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={addPasskey} disabled={isAddingPasskey} aria-label="Dodaj ovaj uređaj za sigurnu prijavu" title="Zaštiti ovaj uređaj" className="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition active:scale-95 disabled:opacity-50">
-              <Fingerprint size={18} />
-            </button>
             <button onClick={() => authClient.signOut({ fetchOptions: { onSuccess: () => { router.replace("/sign-in"); router.refresh(); } } })} aria-label="Odjavi se" title={`Odjavi se (${userName})`} className="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition active:scale-95 lg:hidden">
               <span className="text-[11px] font-bold">{userInitials}</span>
             </button>
@@ -424,11 +399,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
           </div>
         </header>
 
-        {securityMessage && (
-          <div role="status" className="fixed right-4 top-20 z-40 max-w-xs rounded-xl bg-[#202124] px-4 py-3 text-sm font-medium text-white shadow-lg md:right-8">
-            {securityMessage}
-          </div>
-        )}
 
         {activeNav === "Pregled" ? (
           <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
