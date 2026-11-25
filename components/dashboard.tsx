@@ -449,13 +449,13 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
           <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
             <section id="overview" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
               <SummaryCard featured title="Ukupno stanje" value={`${totalBalance < 0 ? "−" : ""}${formatMoney(totalBalance)} €`} icon={<WalletCards size={18} />} tone="dark" trend="OTP + NLB + keš + dodaci − plaćeni redovni troškovi" />
+              <SummaryCard featured title="Slobodno" value={`${availableAfterPlans < 0 ? "−" : ""}${formatMoney(availableAfterPlans)} €`} icon={<Target size={18} />} tone={availableAfterPlans < 0 ? "danger" : availableAfterPlans === 0 ? "success" : "info"} trend="Stanje − očekivani − mjesečni − kućni i lični limit" />
               <SummaryCard title="OTP kartica" value={`${otpBalance < 0 ? "−" : ""}${formatMoney(otpBalance)} €`} icon={<Landmark size={18} />} trend="Stanje na računu" />
               <SummaryCard title="NLB kartica" value={`${nlbAvailable < 0 ? "−" : ""}${formatMoney(nlbAvailable)} €`} icon={<Landmark size={18} />} trend="NLB − 1.300 €" />
               <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<WalletCards size={18} />} trend="Gotovina" />
               <SummaryCard title="Mjesečni troškovi" value={`${formatMoney(monthlyExpensesTotal)} €`} icon={<Target size={18} />} trend={`${formatMoney(fixedExpensesTotal)} € fiksni + ${formatMoney(subscriptionsTotal)} € pretplate`} />
               <SummaryCard title="Dodaci" value={`${formatMoney(additionsTotal)} €`} icon={<ArrowDownLeft size={18} />} trend="Sigurni budući prilivi" />
               <SummaryCard title="Očekivani troškovi" value={`${formatMoney(expectedExpensesTotal)} €`} icon={<ArrowUpRight size={18} />} trend="Umanjuju mjesečne limite" />
-              <SummaryCard featured title="Slobodno nakon planova" value={`${availableAfterPlans < 0 ? "−" : ""}${formatMoney(availableAfterPlans)} €`} icon={<Target size={18} />} tone={availableAfterPlans < 0 ? "danger" : availableAfterPlans === 0 ? "success" : "info"} trend="Stanje − očekivani − mjesečni − kućni i lični limit" />
             </section>
 
             <section className="mt-3 md:mt-4">
@@ -531,7 +531,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                         )}
                         <p className="rounded-lg bg-[#f4f5f7] px-3 py-3 text-xs text-[#686b70] sm:col-span-2">NLB raspoloživo se računa automatski: uneseno stanje minus 1.300 €.</p>
                         <div className={cn("rounded-xl px-4 py-4 text-white sm:col-span-2", draftAvailableAfterPlans < 0 ? "bg-rose-700" : draftAvailableAfterPlans === 0 ? "bg-emerald-700" : "bg-blue-700")}>
-                          <p className="text-sm font-bold text-white/80">Slobodno nakon planova — pregled uživo</p>
+                          <p className="text-sm font-bold text-white/80">Slobodno — pregled uživo</p>
                           <p className="mt-1 text-2xl font-extrabold">{draftAvailableAfterPlans < 0 ? "−" : ""}{formatMoney(draftAvailableAfterPlans)} €</p>
                         </div>
                       </form>
@@ -822,7 +822,7 @@ function SummaryCard({ title, value, icon, tone, trend, featured = false }: Summ
   return (
     <div className={cn(
       "min-h-[116px] min-w-0 rounded-2xl border p-3.5 shadow-[0_2px_12px_rgba(24,24,27,0.035)] transition sm:min-h-[132px] sm:p-5",
-      featured && "col-span-2 min-h-[142px]",
+      featured && "min-h-[142px] xl:col-span-2",
       !tone && "border-zinc-200/80 bg-white",
       tone === "dark" && "border-zinc-800 bg-zinc-900 text-white shadow-lg shadow-zinc-900/10",
       tone === "danger" && "border-rose-700 bg-rose-700 text-white shadow-lg shadow-rose-900/10",
@@ -834,7 +834,7 @@ function SummaryCard({ title, value, icon, tone, trend, featured = false }: Summ
         <div className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg sm:h-8 sm:w-8", colored ? "bg-white/10 text-white" : "bg-zinc-100 text-zinc-500")}>{icon}</div>
       </div>
       <div className="mt-3 sm:mt-5">
-        <p className={cn("whitespace-nowrap font-bold tracking-tight", featured ? "text-[25px] sm:text-[30px]" : "text-[17px] sm:text-[23px]")}>{value}</p>
+        <p className={cn("font-bold tracking-tight [overflow-wrap:anywhere]", featured ? "text-[20px] sm:text-[30px]" : "text-[17px] sm:text-[23px]")}>{value}</p>
         <span className={cn("mt-1 block min-h-4 text-[9px] font-bold leading-tight sm:text-[10px]", colored ? "text-white/80" : "text-emerald-700")}>{trend}</span>
       </div>
     </div>
