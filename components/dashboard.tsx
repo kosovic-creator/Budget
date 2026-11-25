@@ -120,6 +120,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
 
   async function submitBudget(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (budgetSaving || plannedItemSaving) return;
     const form = new FormData(event.currentTarget);
     const next = {
       household: draftBudget.household,
@@ -147,7 +148,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
 
   async function transferCashToOtp(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (budgetSaving) return;
+    if (budgetSaving || plannedItemSaving) return;
     const amount = Number(new FormData(event.currentTarget).get("transferAmount"));
     if (!Number.isFinite(amount) || amount < 0.01 || amount > maxCashTransfer) return;
 
@@ -262,10 +263,12 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
 
   async function addPlannedItem(event: React.FormEvent<HTMLFormElement>, kind: PlannedItemKind) {
     event.preventDefault();
+    if (budgetSaving || plannedItemSaving) return;
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     setPlannedItemSaving(true);
     setPlannedItemMessage("");
+    setBudgetMessage("");
     const result = await createPlannedItem({
       description: String(form.get("description") ?? ""),
       amount: Number(form.get("amount")),
@@ -275,6 +278,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
     if (result.success) {
       setPlannedItems((current) => [...current, result.item]);
       applyUpdatedLimits(result.limits);
+      if (result.item.expenseCategory && result.limits) {
+        const category = result.item.expenseCategory;
+        const label = category === "household" ? "kućne" : "lične";
+        setBudgetMessage(`Limit za ${label} troškove umanjen je za ${formatMoney(result.item.amount)} €. Novi limit je ${formatMoney(result.limits[category])} €.`);
+      }
       setPlannedItemForm(null);
       formElement.reset();
     } else {
@@ -294,6 +302,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
 
   async function editPlannedItem(event: React.FormEvent<HTMLFormElement>, item: PlannedItem) {
     event.preventDefault();
+    if (budgetSaving || plannedItemSaving) return;
     const form = new FormData(event.currentTarget);
     setPlannedItemSaving(true);
     setPlannedItemMessage("");
@@ -469,7 +478,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                     type={editingBudget ? "submit" : "button"}
                     form={editingBudget ? "budget-settings-form" : undefined}
                     onClick={editingBudget ? undefined : (event) => { event.preventDefault(); setDraftBudget(budget); setEditingBudget(true); setBudgetMessage(""); }}
-                    disabled={budgetSaving}
+                    disabled={budgetSaving || plannedItemSaving}
                     className={cn("min-h-12 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition disabled:opacity-60", editingBudget ? "bg-[#31724a] text-white hover:bg-[#285f3e]" : "bg-[#202124] text-white hover:bg-[#34363a]")}
                   >
                     {editingBudget ? (budgetSaving ? "Čuvanje..." : "✓ Sačuvaj i završi") : "+ Unos stanja i plana"}
@@ -773,7 +782,7 @@ function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, savin
           <input name="description" required maxLength={120} placeholder="Opis" aria-label={`Opis za ${title.toLowerCase()}`} className="h-10 min-w-0 rounded-lg border border-[#dfe1e3] bg-white px-3 text-sm outline-none focus:border-[#919b93]" />
           <input name="amount" required type="number" min="0.01" max="9999999999.99" step="0.01" placeholder="Iznos €" aria-label={`Iznos za ${title.toLowerCase()}`} className="h-11 min-w-0 rounded-lg border border-[#cfd3d6] bg-white px-3 text-base font-bold outline-none focus:border-[#6f8173]" />
           {kind === "expectedExpense" ? (
-            <label className="col-span-2 text-xs font-semibold text-zinc-600">Umanjiti limit
+            <label className="col-span-2 text-xs font-semibold text-zinc-600">Umanji limit nakon čuvanja stavke
               <select name="expenseCategory" required defaultValue="" className="mt-1.5 h-11 w-full rounded-lg border border-[#cfd3d6] bg-white px-3 text-[16px] font-semibold outline-none focus:border-[#6f8173] sm:text-sm">
                 <option value="" disabled>Izaberite vrstu troška</option>
                 <option value="household">Kućni troškovi</option>
