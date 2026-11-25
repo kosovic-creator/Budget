@@ -84,7 +84,7 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid, on
     }
   }
 
-  const title = view === "fixed" ? "Redovni troškovi" : "Pretplate";
+  const title = view === "fixed" ? "Redovni" : "Pretplate";
 
   return (
     <section className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">

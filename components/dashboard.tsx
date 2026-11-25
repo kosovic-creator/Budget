@@ -241,14 +241,14 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   }, 0) / 100;
   const deductions = { otp: householdSpent + personalSpent - incomeTotal, household: householdSpent, personal: personalSpent, nlb: 0, cash: 0 };
   const otpBalance = budget.otp - deductions.otp;
-  function balanceAfterPayments(settings: BudgetSettings) {
+  function balanceAfterMonthlyExpenses(settings: BudgetSettings) {
     return settings.otp - deductions.otp + (settings.nlb - 1300) + settings.cash
-      + additionsTotal - paidRegularExpensesTotal;
+      + additionsTotal - monthlyExpensesTotal;
   }
-  const totalBalance = balanceAfterPayments(budget);
+  const totalBalance = balanceAfterMonthlyExpenses(budget);
   function afterPlans(settings: BudgetSettings) {
-    const balance = balanceAfterPayments(settings);
-    return Math.round((balance - expectedExpensesTotal - monthlyExpensesTotal
+    const balance = balanceAfterMonthlyExpenses(settings);
+    return Math.round((balance - expectedExpensesTotal
       - (settings.household - householdSpent) - (settings.personal - personalSpent)) * 100) / 100;
   }
   const availableAfterPlans = afterPlans(budget);
@@ -387,7 +387,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         <nav className="mt-3 flex-1 space-y-1 px-4">
           {[
             { label: "Pregled", icon: LayoutGrid },
-            { label: "Redovni troškovi", icon: Target },
+            { label: "Redovni", icon: Target },
             { label: "Pretplate", icon: CreditCard },
             { label: "Banka", icon: Landmark },
           ].map((item) => (
@@ -447,14 +447,14 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
 
         {activeNav === "Pregled" ? (
           <div className="mx-auto max-w-[1440px] px-4 py-4 sm:px-5 md:px-8 md:py-7 lg:px-10">
-            <section id="overview" className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
-              <SummaryCard featured title="Ukupno stanje" value={`${totalBalance < 0 ? "−" : ""}${formatMoney(totalBalance)} €`} icon={<WalletCards size={18} />} tone="dark" trend="OTP + NLB + keš + dodaci − plaćeni redovni troškovi" />
-              <SummaryCard featured title="Slobodno" value={`${availableAfterPlans < 0 ? "−" : ""}${formatMoney(availableAfterPlans)} €`} icon={<Target size={18} />} tone={availableAfterPlans < 0 ? "danger" : availableAfterPlans === 0 ? "success" : "info"} trend="Stanje − očekivani − mjesečni − kućni i lični limit" />
+            <section id="overview" className="grid grid-cols-2 gap-3 md:gap-4">
+              <SummaryCard featured title="Ukupno stanje" value={`${totalBalance < 0 ? "−" : ""}${formatMoney(totalBalance)} €`} icon={<WalletCards size={18} />} tone="dark" trend="OTP + NLB + keš + dodaci − preostali mjesečni troškovi" />
+              <SummaryCard featured title="Slobodno" value={`${availableAfterPlans < 0 ? "−" : ""}${formatMoney(availableAfterPlans)} €`} icon={<Target size={18} />} tone={availableAfterPlans < 0 ? "danger" : availableAfterPlans === 0 ? "success" : "info"} trend="Ukupno stanje − očekivani troškovi − kućni i lični limit" />
               <SummaryCard title="OTP kartica" value={`${otpBalance < 0 ? "−" : ""}${formatMoney(otpBalance)} €`} icon={<Landmark size={18} />} trend="Stanje na računu" />
               <SummaryCard title="NLB kartica" value={`${nlbAvailable < 0 ? "−" : ""}${formatMoney(nlbAvailable)} €`} icon={<Landmark size={18} />} trend="NLB − 1.300 €" />
               <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<WalletCards size={18} />} trend="Gotovina" />
-              <SummaryCard title="Mjesečni troškovi" value={`${formatMoney(monthlyExpensesTotal)} €`} icon={<Target size={18} />} trend={`${formatMoney(fixedExpensesTotal)} € fiksni + ${formatMoney(subscriptionsTotal)} € pretplate`} />
               <SummaryCard title="Dodaci" value={`${formatMoney(additionsTotal)} €`} icon={<ArrowDownLeft size={18} />} trend="Sigurni budući prilivi" />
+              <SummaryCard title="Mjesečni troškovi" value={`${formatMoney(monthlyExpensesTotal)} €`} icon={<Target size={18} />} trend={`${formatMoney(fixedExpensesTotal)} € fiksni + ${formatMoney(subscriptionsTotal)} € pretplate`} />
               <SummaryCard title="Očekivani troškovi" value={`${formatMoney(expectedExpensesTotal)} €`} icon={<ArrowUpRight size={18} />} trend="Umanjuju mjesečne limite" />
             </section>
 
@@ -594,7 +594,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
               {formError && <p role="alert" className="border-t border-[#eceeef] px-4 py-3 text-sm font-medium text-red-600 md:px-6">{formError}</p>}
             </section>
           </div>
-        ) : activeNav === "Redovni troškovi" ? (
+        ) : activeNav === "Redovni" ? (
           <MonthlyExpenses view="fixed" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} onPaymentReset={(id) => setTransactions((current) => current.filter((transaction) => transaction.id !== id))} />
         ) : activeNav === "Pretplate" ? (
           <MonthlyExpenses view="subscription" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} />
@@ -606,7 +606,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
       <nav aria-label="Glavna navigacija" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-zinc-200/80 bg-white/85 px-1 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(24,24,27,0.05)] backdrop-blur-xl lg:hidden">
         {[
           { label: "Pregled", icon: Home },
-          { label: "Redovni troškovi", icon: Target },
+          { label: "Redovni", icon: Target },
           { label: "Pretplate", icon: CreditCard },
           { label: "Banka", icon: Landmark },
         ].map((item) => (
@@ -822,7 +822,7 @@ function SummaryCard({ title, value, icon, tone, trend, featured = false }: Summ
   return (
     <div className={cn(
       "min-h-[116px] min-w-0 rounded-2xl border p-3.5 shadow-[0_2px_12px_rgba(24,24,27,0.035)] transition sm:min-h-[132px] sm:p-5",
-      featured && "min-h-[142px] xl:col-span-2",
+      featured && "min-h-[142px]",
       !tone && "border-zinc-200/80 bg-white",
       tone === "dark" && "border-zinc-800 bg-zinc-900 text-white shadow-lg shadow-zinc-900/10",
       tone === "danger" && "border-rose-700 bg-rose-700 text-white shadow-lg shadow-rose-900/10",
