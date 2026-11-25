@@ -227,6 +227,14 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [plannedItems, setPlannedItems] = useState(initialPlannedItems);
+  const plannedDetailsDialog = useRef<HTMLDialogElement>(null);
+  const [plannedDetailsKind, setPlannedDetailsKind] = useState<PlannedItemKind>("addition");
+  const plannedDetailsItems = plannedItems.filter((item) => item.kind === plannedDetailsKind);
+
+  function openPlannedDetails(kind: PlannedItemKind) {
+    setPlannedDetailsKind(kind);
+    plannedDetailsDialog.current?.showModal();
+  }
   const [recurringItems, setRecurringItems] = useState(initialRecurringItems);
   const [plannedItemForm, setPlannedItemForm] = useState<PlannedItemKind | null>(null);
   const [plannedItemSaving, setPlannedItemSaving] = useState(false);
@@ -487,9 +495,9 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
               <SummaryCard title="OTP kartica" value={`${otpBalance < 0 ? "−" : ""}${formatMoney(otpBalance)} €`} icon={<Landmark size={18} />} trend="Stanje na računu" />
               <SummaryCard title="NLB kartica" value={`${nlbAvailable < 0 ? "−" : ""}${formatMoney(nlbAvailable)} €`} icon={<Landmark size={18} />} trend="NLB − 1.300 €" />
               <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<WalletCards size={18} />} trend="Gotovina" />
-              <SummaryCard title="Dodaci" value={`${formatMoney(additionsTotal)} €`} icon={<ArrowDownLeft size={18} />} trend="Sigurni budući prilivi" />
+              <SummaryCard title="Dodaci" value={`${formatMoney(additionsTotal)} €`} icon={<ArrowDownLeft size={18} />} trend="Sigurni budući prilivi" onClick={() => openPlannedDetails("addition")} />
               <SummaryCard title="Mjesečni troškovi" value={`${formatMoney(monthlyExpensesTotal)} €`} icon={<Target size={18} />} trend={`${formatMoney(fixedExpensesTotal)} € fiksni + ${formatMoney(subscriptionsTotal)} € pretplate`} />
-              <SummaryCard title="Očekivani troškovi" value={`${formatMoney(expectedExpensesTotal)} €`} icon={<ArrowUpRight size={18} />} trend="Umanjuju mjesečne limite" />
+              <SummaryCard title="Očekivani troškovi" value={`${formatMoney(expectedExpensesTotal)} €`} icon={<ArrowUpRight size={18} />} trend="Umanjuju mjesečne limite" onClick={() => openPlannedDetails("expectedExpense")} />
             </section>
 
             <section className="mt-3 md:mt-4">
@@ -662,6 +670,37 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         ))}
       </nav>
 
+      <dialog ref={plannedDetailsDialog} aria-labelledby="planned-details-title"
+        className="fixed inset-0 m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl bg-white p-5 text-zinc-900 shadow-2xl backdrop:bg-zinc-950/45">
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="planned-details-title" className="text-lg font-bold">
+            {plannedDetailsKind === "addition" ? "Dodaci" : "Očekivani troškovi"}
+          </h2>
+          <button type="button" aria-label="Zatvori detalje" onClick={() => plannedDetailsDialog.current?.close()}
+            className="grid size-11 shrink-0 place-items-center rounded-full bg-zinc-100 text-zinc-600"><X size={18} aria-hidden /></button>
+        </div>
+        {plannedDetailsItems.length ? (
+          <ul className="mt-3 divide-y divide-zinc-200">
+            {plannedDetailsItems.map((item) => (
+              <li key={item.id} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 py-3 text-sm">
+                <div className="min-w-0 flex-1 break-words">
+                  <p className="font-medium">{item.description}</p>
+                  {item.kind === "expectedExpense" && (
+                    <p className="mt-1 text-xs text-zinc-600">
+                      {item.expenseCategory === "household" ? "Kućni limit" : item.expenseCategory === "personal" ? "Lični limit" : "Limit nije odabran"}
+                    </p>
+                  )}
+                </div>
+                <strong className="shrink-0 tabular-nums">{formatMoney(item.amount)} €</strong>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="py-4 text-sm text-zinc-600">Još nema unesenih stavki.</p>}
+        <div className="flex justify-between gap-3 border-t border-zinc-200 pt-3 text-sm font-bold">
+          <span>Ukupno</span>
+          <span>{formatMoney(plannedDetailsKind === "addition" ? additionsTotal : expectedExpensesTotal)} €</span>
+        </div>
+      </dialog>
       <dialog ref={passwordDialog} aria-labelledby="password-dialog-title"
         onCancel={(event) => { if (passwordSaving || passkeySaving) event.preventDefault(); }}
         onClose={() => passwordDialog.current?.querySelector("form")?.reset()}
@@ -778,6 +817,7 @@ interface SummaryCardProps {
   tone?: "dark" | "danger" | "success" | "info";
   trend: string;
   featured?: boolean;
+  onClick?: () => void;
 }
 
 interface PlannedItemsCardProps {
@@ -858,11 +898,11 @@ function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, savin
   );
 }
 
-function SummaryCard({ title, value, icon, tone, trend, featured = false }: SummaryCardProps) {
+function SummaryCard({ title, value, icon, tone, trend, featured = false, onClick }: SummaryCardProps) {
   const colored = Boolean(tone);
   return (
     <div className={cn(
-      "min-h-[116px] min-w-0 rounded-2xl border p-3.5 shadow-[0_2px_12px_rgba(24,24,27,0.035)] transition sm:min-h-[132px] sm:p-5",
+      "relative min-h-[116px] min-w-0 rounded-2xl border p-3.5 shadow-[0_2px_12px_rgba(24,24,27,0.035)] transition sm:min-h-[132px] sm:p-5",
       featured && "min-h-[142px]",
       !tone && "border-zinc-200/80 bg-white",
       tone === "dark" && "border-zinc-800 bg-zinc-900 text-white shadow-lg shadow-zinc-900/10",
@@ -878,6 +918,8 @@ function SummaryCard({ title, value, icon, tone, trend, featured = false }: Summ
         <p className={cn("font-bold tracking-tight [overflow-wrap:anywhere]", featured ? "text-[20px] sm:text-[30px]" : "text-[17px] sm:text-[23px]")}>{value}</p>
         <span className={cn("mt-1 block min-h-4 text-[9px] font-bold leading-tight sm:text-[10px]", colored ? "text-white/80" : "text-emerald-700")}>{trend}</span>
       </div>
+      {onClick && <button type="button" aria-label={`Prikaži detalje: ${title}`} aria-haspopup="dialog"
+        onClick={onClick} className="absolute inset-0 cursor-pointer rounded-2xl hover:bg-zinc-900/5 focus-visible:outline-2 focus-visible:outline-emerald-600" />}
     </div>
   );
 }
