@@ -3,36 +3,72 @@
 import { Plus, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useConfirmation } from "@/components/confirmation-dialog";
-import { addBankDeduction, deleteBankAccount, deleteBankDeduction, saveBankAccount } from "@/app/actions";
+import { addBankDeduction, deleteBankAccount, deleteBankDeduction, saveBankAccount, transferBankCashToOtp } from "@/app/actions";
 import type { BankAccount } from "@/lib/bank";
 
 interface BankAccountsProps {
-  initialAccounts: BankAccount[];
+  accounts: BankAccount[];
+  setAccounts: React.Dispatch<React.SetStateAction<BankAccount[]>>;
+  onOtpTransfer: (otp: number) => void;
 }
 
 function money(value: number) {
   return new Intl.NumberFormat("sr-RS", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 }
 
-export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
-  const [accounts, setAccounts] = useState(initialAccounts);
+const installmentSuffix = /(?:^|\n)\[broj-rata:(\d+)\]$/;
+
+export default function BankAccounts({ accounts, setAccounts, onOtpTransfer }: BankAccountsProps) {
   const { confirmRemoval, confirmation } = useConfirmation();
   const [adding, setAdding] = useState(false);
   const [deductionFormAccountId, setDeductionFormAccountId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [transferAccountId, setTransferAccountId] = useState<string | null>(null);
+  const [amountRevision, setAmountRevision] = useState(0);
+  const [loanAmounts, setLoanAmounts] = useState<Record<string, string>>({});
   const total = accounts.reduce((sum, account) => sum + account.amount - account.deductions.reduce((deductions, item) => deductions + item.amount, 0), 0);
 
   async function saveAccount(event: React.FormEvent<HTMLFormElement>, account?: BankAccount) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setBusy(account?.id ?? "new"); setMessage("");
-    const result = await saveBankAccount({ id: account?.id, name: String(form.get("name") ?? ""), amount: Number(form.get("amount")), note: account?.note ?? "" });
+    const installments = form.get("installments");
+    let note = account?.note ?? "";
+    if (installments !== null) {
+      note = note.replace(installmentSuffix, "");
+      if (installments) note = [note, `[broj-rata:${installments}]`].filter(Boolean).join("\n");
+    }
+    const result = await saveBankAccount({ id: account?.id, name: String(form.get("name") ?? ""), amount: Number(form.get("amount")), note });
     if (result.success) {
       setAccounts((current) => account ? current.map((item) => item.id === account.id ? { ...result.account, deductions: account.deductions } : item) : [...current, result.account]);
       setAdding(false); setMessage("Sačuvano.");
     } else setMessage(result.message);
     setBusy(null);
+  }
+
+  async function transferToOtp(event: React.FormEvent<HTMLFormElement>, account: BankAccount) {
+    event.preventDefault();
+    if (busy) return;
+    const amount = Number(new FormData(event.currentTarget).get("transferAmount"));
+    setBusy(account.id);
+    setMessage("");
+    try {
+      const result = await transferBankCashToOtp(account.id, amount);
+      if (!result.success) {
+        setMessage(result.message);
+        return;
+      }
+      setAccounts((current) => current.map((item) => item.id === account.id ? { ...item, amount: result.amount } : item));
+      onOtpTransfer(result.otp);
+      setAmountRevision((revision) => revision + 1);
+      setTransferAccountId(null);
+      setMessage(`Preneseno na OTP karticu: ${money(amount)} €.`);
+    } catch {
+      setMessage("Prenos nije potvrđen. Osvježite stranicu prije novog pokušaja.");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function removeAccount(account: BankAccount) {
@@ -74,13 +110,20 @@ export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
 
         <div className="mt-5 space-y-4">
           {accounts.length === 0 ? <p className="rounded-xl bg-[#f5f6f7] p-5 text-sm text-[#85888d]">Još nema bankovnih stavki.</p> : accounts.map((account, index) => {
-            if (index > 0) {
+            const isOtpMain = /^otp\s+glavni\b/i.test(account.name.trim());
+            const isLoan = /\bkredit\b/i.test(account.name);
+            if (isLoan || (index > 0 && !isOtpMain)) {
               return (
                 <form key={account.id} onSubmit={(event) => saveAccount(event, account)} className="grid grid-cols-[minmax(58px,1fr)_82px_42px_42px] items-end gap-1.5 rounded-2xl border border-zinc-200/80 p-3 sm:grid-cols-[minmax(0,1fr)_150px_44px_44px] sm:gap-2 sm:p-4">
                   <Field label="Naziv" name="name" defaultValue={account.name} />
-                  <Field label="Iznos (€)" name="amount" type="number" min="0" step="0.01" defaultValue={account.amount} />
+                  <Field label="Iznos (€)" name="amount" type="number" min="0" step="0.01" defaultValue={account.amount}
+                    onChange={isLoan ? (event) => {
+                      const value = event.target.value;
+                      setLoanAmounts((current) => ({ ...current, [account.id]: value }));
+                    } : undefined} />
                   <SaveButton disabled={busy === account.id} label={`Sačuvaj ${account.name}`} />
                   <button type="button" onClick={() => removeAccount(account)} disabled={busy === account.id} aria-label={`Ukloni ${account.name}`} className="grid h-11 w-10 place-items-center rounded-xl border border-zinc-200 text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-50 sm:h-12 sm:w-11"><Trash2 size={17} /></button>
+                  {isLoan && <LoanInstallments account={account} amount={Number(loanAmounts[account.id] ?? account.amount)} />}
                 </form>
               );
             }
@@ -89,10 +132,26 @@ export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
               <article key={account.id} className="rounded-2xl border border-zinc-200/80 p-4 shadow-[0_2px_10px_rgba(24,24,27,0.025)]">
                 <form onSubmit={(event) => saveAccount(event, account)} className="grid grid-cols-[minmax(58px,1fr)_82px_42px_42px] items-end gap-1.5 sm:grid-cols-[minmax(0,1fr)_150px_44px_44px] sm:gap-2">
                   <Field label="Naziv" name="name" defaultValue={account.name} />
-                  <Field label="Iznos (€)" name="amount" type="number" min="0" step="0.01" defaultValue={account.amount} />
+                  <Field key={isOtpMain ? amountRevision : undefined} label="Iznos (€)" name="amount" type="number" min="0" step="0.01" defaultValue={account.amount} />
                   <SaveButton disabled={busy === account.id} label={`Sačuvaj ${account.name}`} />
                   <button type="button" onClick={() => removeAccount(account)} disabled={busy === account.id} aria-label={`Ukloni ${account.name}`} className="grid h-11 w-10 place-items-center rounded-xl border border-zinc-200 text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-50 sm:h-12 sm:w-11"><Trash2 size={17} /></button>
                 </form>
+
+                {isOtpMain && (
+                  <div className="mt-3">
+                    <button type="button" aria-expanded={transferAccountId === account.id} disabled={busy !== null}
+                      onClick={() => setTransferAccountId((current) => current === account.id ? null : account.id)}
+                      className="min-h-11 rounded-xl border border-zinc-200 px-3 text-sm font-bold">Prebaci na OTP karticu</button>
+                    {transferAccountId === account.id && (
+                      <form onSubmit={(event) => transferToOtp(event, account)} className="mt-2 flex items-end gap-2">
+                        <Field label="Iznos prenosa (€)" name="transferAmount" type="number" inputMode="decimal" min="0.01" max={account.amount} step="0.01" disabled={busy !== null} />
+                        <button type="submit" disabled={busy !== null} className="min-h-11 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50">
+                          {busy === account.id ? "Čuvanje…" : "Prenesi"}
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-4 border-t border-[#eceeef] pt-4">
                   <p className="text-sm font-bold">Planirani odbici</p>
@@ -126,6 +185,25 @@ export default function BankAccounts({ initialAccounts }: BankAccountsProps) {
         {message ? <p role="status" className="mt-4 text-sm font-medium text-[#66816d]">{message}</p> : null}
       </div>
     </section>
+  );
+}
+
+function LoanInstallments({ account, amount }: { account: BankAccount; amount: number }) {
+  const [count, setCount] = useState(account.note.match(installmentSuffix)?.[1] ?? "");
+  const installment = Number.isInteger(Number(count)) && Number(count) > 0 && Number.isFinite(amount) && amount >= 0
+    ? amount / Number(count) : null;
+  return (
+    <fieldset className="col-span-full mt-2 grid grid-cols-2 gap-2 rounded-xl border border-zinc-200 p-3">
+      <legend className="px-1 text-sm font-bold">Iznos rate</legend>
+      <Field label="Broj rata" name="installments" type="number" min="1" max="10000" step="1"
+        required={false} value={count} onChange={(event) => setCount(event.target.value)} />
+      <label className="min-w-0 text-[11px] font-semibold text-zinc-700 sm:text-sm">
+        Iznos po rati (€)
+        <output className="mt-2 flex min-h-11 items-center rounded-xl bg-zinc-50 px-2 text-base font-bold sm:min-h-12">
+          {installment === null ? "—" : `${money(installment)} €`}
+        </output>
+      </label>
+    </fieldset>
   );
 }
 

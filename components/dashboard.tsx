@@ -73,6 +73,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const currentPeriod = new Intl.DateTimeFormat("sr-Latn-ME", { month: "long", year: "numeric" }).format(new Date());
   const userInitials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((name) => name[0]).join("").toUpperCase() || "JA";
   const [budget, setBudget] = useState(initialBudget);
+  const [bankAccounts, setBankAccounts] = useState(initialBankAccounts);
   const passwordDialog = useRef<HTMLDialogElement>(null);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordFeedback, setPasswordFeedback] = useState<{ error: boolean; message: string } | null>(null);
@@ -608,7 +609,10 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         ) : activeNav === "Pretplate" ? (
           <MonthlyExpenses view="subscription" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} />
         ) : (
-          <BankAccounts initialAccounts={initialBankAccounts} />
+          <BankAccounts accounts={bankAccounts} setAccounts={setBankAccounts} onOtpTransfer={(otp) => {
+            setBudget((current) => ({ ...current, otp }));
+            setDraftBudget((current) => ({ ...current, otp }));
+          }} />
         )}
       </main>
 

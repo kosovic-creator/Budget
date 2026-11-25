@@ -288,6 +288,38 @@ export async function saveBankAccount(input: { id?: string; name: string; amount
   }
 }
 
+export async function transferBankCashToOtp(id: string, amount: number) {
+  if (!(await auth.api.getSession({ headers: await headers() }))) return { success: false as const, message: "Sesija je istekla." };
+  const cents = Math.round(amount * 100);
+  if (!Number.isSafeInteger(cents) || cents < 1 || cents > 999_999_999_999) {
+    return { success: false as const, message: "Unesite ispravan iznos prenosa." };
+  }
+  const value = cents / 100;
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const source = await tx.bankAccount.findUnique({ where: { id } });
+      if (!source || !/^otp\s+glavni\b/i.test(source.name.trim())) {
+        return { success: false as const, message: "Glavni OTP račun nije pronađen." };
+      }
+      const changed = await tx.bankAccount.updateMany({
+        where: { id, name: source.name, amount: { gte: value } },
+        data: { amount: { decrement: value } },
+      });
+      if (!changed.count) return { success: false as const, message: "Iznos prelazi stanje glavnog OTP računa." };
+      const budget = await tx.budgetSettings.upsert({
+        where: { id: "default" },
+        create: { id: "default", otp: value },
+        update: { otp: { increment: value } },
+      });
+      const account = await tx.bankAccount.findUniqueOrThrow({ where: { id } });
+      return { success: true as const, amount: Number(account.amount), otp: Number(budget.otp) };
+    });
+  } catch (error) {
+    console.error("Neuspješan prenos na OTP karticu.", error);
+    return { success: false as const, message: "Prenos nije sačuvan. Pokušajte ponovo." };
+  }
+}
+
 export async function deleteBankAccount(id: string) {
   if (!(await auth.api.getSession({ headers: await headers() }))) return { success: false as const, message: "Sesija je istekla." };
   try {
