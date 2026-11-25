@@ -12,7 +12,7 @@ interface MonthlyExpensesProps {
   items: RecurringItem[];
   onItemsChange: (items: RecurringItem[]) => void;
   onPaid: (transaction: Transaction) => void;
-  onPaymentReset?: (transactionId: string) => void;
+  onPaymentReset: (transactionId: string) => void;
 }
 
 function formatMoney(value: number) {
@@ -73,7 +73,7 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid, on
         return;
       }
       onItemsChange(items.map((entry) => entry.id === item.id ? { ...entry, paid: false } : entry));
-      onPaymentReset?.(result.transactionId);
+      onPaymentReset(result.transactionId);
       setMessage(result.removedTransaction
         ? "Plaćanje je poništeno."
         : "Stavka je vraćena na „Plati“. Raniji zapis provjerite u Posljednjim transakcijama.");
@@ -110,12 +110,12 @@ export default function MonthlyExpenses({ view, items, onItemsChange, onPaid, on
 
         <div className="mt-5 space-y-3">
           {visibleItems.length === 0 ? <p className="rounded-2xl bg-zinc-50 p-5 text-sm text-zinc-500">Još nema unesenih stavki.</p> : visibleItems.map((item) => (
-            <form key={item.id} onSubmit={(event) => save(event, item.kind, item.id)} className={`grid items-end gap-1 rounded-2xl border border-zinc-200/80 p-2 sm:gap-2 sm:p-4 ${view === "fixed" ? "grid-cols-[minmax(0,1fr)_60px_repeat(4,40px)] sm:grid-cols-[minmax(0,1fr)_140px_repeat(4,44px)]" : "grid-cols-[minmax(52px,1fr)_68px_repeat(3,40px)] sm:grid-cols-[minmax(0,1fr)_140px_repeat(3,44px)]"}`}>
+            <form key={item.id} onSubmit={(event) => save(event, item.kind, item.id)} className="grid grid-cols-[minmax(0,1fr)_60px_repeat(4,40px)] items-end gap-1 rounded-2xl border border-zinc-200/80 p-2 sm:grid-cols-[minmax(0,1fr)_140px_repeat(4,44px)] sm:gap-2 sm:p-4">
               <label className="min-w-0 overflow-hidden text-[11px] font-semibold text-zinc-700 sm:text-sm">Naziv<input name="name" required defaultValue={item.name} className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-2 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" /></label>
               <label className="min-w-0 overflow-hidden text-[11px] font-semibold text-zinc-700 sm:text-sm">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" step="0.01" defaultValue={item.amount} className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 px-1.5 text-[16px] font-bold outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" /></label>
               <button disabled={savingId === item.id} aria-label={`Sačuvaj ${item.name}`} title="Sačuvaj" className="grid h-11 w-10 place-items-center rounded-xl border border-zinc-200 text-zinc-700 transition active:scale-[0.98] disabled:opacity-60 sm:h-12 sm:w-11"><Save size={17} /></button>
               <button type="button" onClick={() => pay(item)} disabled={savingId === item.id || item.paid} aria-label={item.paid ? `${item.name} je plaćeno` : `Plati ${item.name}`} title={item.paid ? "Plaćeno" : "Plati"} className="grid h-11 w-10 place-items-center rounded-xl bg-zinc-900 text-white transition active:scale-95 disabled:bg-emerald-50 disabled:text-emerald-700 disabled:opacity-100 sm:h-12 sm:w-11">{item.paid ? <CircleCheckBig size={18} /> : <CreditCard size={18} />}</button>
-              {view === "fixed" && <button type="button" onClick={() => resetPayment(item)} disabled={!item.paid || savingId !== null} aria-label={`Poništi plaćanje za ${item.name}`} title="Poništi plaćanje" className="grid h-11 w-10 place-items-center rounded-xl border border-zinc-200 text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 sm:h-12 sm:w-11"><RotateCcw size={17} /></button>}
+              <button type="button" onClick={() => resetPayment(item)} disabled={!item.paid || savingId !== null} aria-label={`Poništi plaćanje za ${item.name}`} title="Poništi plaćanje" className="grid h-11 w-10 place-items-center rounded-xl border border-zinc-200 text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 sm:h-12 sm:w-11"><RotateCcw size={17} /></button>
               <button type="button" onClick={() => remove(item)} disabled={savingId === item.id} aria-label={`Ukloni ${item.name}`} className="grid h-11 w-10 place-items-center rounded-xl border border-zinc-200 text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:opacity-60 sm:h-12 sm:w-11"><Trash2 size={17} /></button>
             </form>
           ))}

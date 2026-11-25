@@ -259,7 +259,7 @@ export async function resetRecurringPayment(id: string) {
   try {
     const removed = await prisma.$transaction(async (tx) => {
       await tx.recurringItem.update({
-        where: { id, kind: "FIXED", paidCycle: cycle },
+        where: { id, paidCycle: cycle },
         data: { paid: false, paidCycle: null },
       });
       return tx.transaction.deleteMany({ where: { id: transactionId } });

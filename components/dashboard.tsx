@@ -607,7 +607,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         ) : activeNav === "Redovni" ? (
           <MonthlyExpenses view="fixed" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} onPaymentReset={(id) => setTransactions((current) => current.filter((transaction) => transaction.id !== id))} />
         ) : activeNav === "Pretplate" ? (
-          <MonthlyExpenses view="subscription" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} />
+          <MonthlyExpenses view="subscription" items={recurringItems} onItemsChange={setRecurringItems} onPaid={(transaction) => setTransactions((current) => [transaction, ...current])} onPaymentReset={(id) => setTransactions((current) => current.filter((transaction) => transaction.id !== id))} />
         ) : (
           <BankAccounts accounts={bankAccounts} setAccounts={setBankAccounts} onOtpTransfer={(otp) => {
             setBudget((current) => ({ ...current, otp }));
