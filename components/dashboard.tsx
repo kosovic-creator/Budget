@@ -189,20 +189,66 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   const [cashTransferOpen, setCashTransferOpen] = useState(false);
   const [budgetSaving, setBudgetSaving] = useState(false);
   const [budgetMessage, setBudgetMessage] = useState("");
+  const [quickBalanceField, setQuickBalanceField] = useState<"otp" | "cash" | "nlb" | null>(null);
+  const [quickBalanceValue, setQuickBalanceValue] = useState("");
+
+  function toggleQuickBalanceEditor(field: "otp" | "cash" | "nlb", currentValue: number) {
+    if (quickBalanceField === field) {
+      setQuickBalanceField(null);
+      if (field === "cash") setCashTransferOpen(false);
+      return;
+    }
+    setQuickBalanceValue(String(Math.round(currentValue * 100) / 100));
+    setBudgetMessage("");
+    setQuickBalanceField(field);
+  }
+
+  async function saveQuickBalance(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (budgetSaving || !quickBalanceField) return;
+    const enteredValue = Number(new FormData(event.currentTarget).get("balance"));
+    const minimum = quickBalanceField === "otp" ? -deductions.otp : 0;
+    const maximum = quickBalanceField === "otp" ? 9_999_999_999.99 - deductions.otp : 9_999_999_999.99;
+    if (!Number.isFinite(enteredValue) || enteredValue < minimum || enteredValue > maximum) {
+      setBudgetMessage("Unesite ispravan iznos.");
+      return;
+    }
+
+    const value = quickBalanceField === "otp"
+      ? Math.round((enteredValue + deductions.otp) * 100) / 100
+      : enteredValue;
+    const next = { ...budget, [quickBalanceField]: value };
+    setBudgetSaving(true);
+    setBudgetMessage("");
+    try {
+      const result = await saveBudget(next);
+      if (!result.success) {
+        setBudgetMessage(result.message);
+        return;
+      }
+      setBudget(next);
+      setDraftBudget(next);
+      setQuickBalanceField(null);
+      setCashTransferOpen(false);
+      const savedMessage = quickBalanceField === "otp"
+        ? "Iznos na OTP kartici je sačuvan."
+        : quickBalanceField === "nlb"
+          ? "Iznos na NLB kartici je sačuvan."
+          : "Keš je sačuvan.";
+      setBudgetMessage(savedMessage);
+    } catch {
+      setBudgetMessage("Iznos nije sačuvan. Pokušajte ponovo.");
+    } finally {
+      setBudgetSaving(false);
+    }
+  }
 
   async function submitBudget(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (budgetSaving || plannedItemSaving) return;
-    const form = new FormData(event.currentTarget);
     const next = {
-      household: draftBudget.household,
-      personal: draftBudget.personal,
+      ...draftBudget,
       other: 0,
-      cash: Number(form.get("cash")),
-      otp: draftBudget.otp,
-      nlb: Number(form.get("nlb")),
-      additions: Number(form.get("additions")),
-      expectedExpenses: Number(form.get("expectedExpenses")),
     };
     setBudgetSaving(true); setBudgetMessage("");
     try {
@@ -214,23 +260,24 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   }
 
   const maxCashTransfer = Math.max(0, Math.min(
-    Math.round(draftBudget.cash * 100),
-    999_999_999_999 - Math.round(draftBudget.otp * 100),
+    Math.round(budget.cash * 100),
+    999_999_999_999 - Math.round(budget.otp * 100),
   )) / 100;
 
   async function transferCashToOtp(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (budgetSaving || plannedItemSaving) return;
-    const budgetForm = document.getElementById("budget-settings-form");
-    if (budgetForm instanceof HTMLFormElement && !budgetForm.reportValidity()) return;
     const amount = Number(new FormData(event.currentTarget).get("transferAmount"));
-    if (!Number.isFinite(amount) || amount < 0.01 || amount > maxCashTransfer) return;
+    if (!Number.isFinite(amount) || amount < 0.01 || amount > maxCashTransfer) {
+      setBudgetMessage("Unesite iznos koji ne prelazi raspoloživi keš.");
+      return;
+    }
 
     const cents = Math.round(amount * 100);
     const next = {
-      ...draftBudget,
-      cash: (Math.round(draftBudget.cash * 100) - cents) / 100,
-      otp: (Math.round(draftBudget.otp * 100) + cents) / 100,
+      ...budget,
+      cash: (Math.round(budget.cash * 100) - cents) / 100,
+      otp: (Math.round(budget.otp * 100) + cents) / 100,
     };
     setBudgetSaving(true);
     setBudgetMessage("");
@@ -242,6 +289,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
       }
       setBudget(next);
       setDraftBudget(next);
+      setQuickBalanceValue(String(next.cash));
       setCashTransferOpen(false);
       setBudgetMessage("Prenos na OTP je sačuvan.");
     } catch {
@@ -575,11 +623,8 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                 <section aria-label="Unos stanja i plana" className="col-span-2 min-w-0 space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 md:p-6">
                   <form id="budget-settings-form" onSubmit={submitBudget} className="grid gap-3 border-t border-[#e7e8ea] pt-4 sm:grid-cols-2">
                     {([
-                      ["otp", "Stanje na OTP računu"],
-                      ["nlb", "Ukupno stanje na NLB računu"],
                       ["household", "Mjesečni limit za kućne troškove"],
                       ["personal", "Mjesečni limit za lične troškove"],
-                      ["cash", "Trenutni iznos keša"],
                     ] as const).map(([key, label]) => (
                       <div key={key} className="flex items-end gap-2">
                       <label className="min-w-0 flex-1 text-sm font-bold text-[#555a60]">
@@ -592,30 +637,9 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                           setDraftBudget((current) => ({ ...current, [key]: Math.round((amount + deductions[key]) * 100) / 100 }));
                         }} disabled={budgetSaving} className="mt-2 h-14 w-full rounded-xl border-2 border-[#cfd3d6] px-4 text-xl font-extrabold tracking-tight outline-none focus:border-[#6f8173]" />
                       </label>
-                      {key === "cash" && (
-                        <button type="button" aria-label="Prenesi keš na OTP račun" aria-expanded={cashTransferOpen}
-                          disabled={budgetSaving || maxCashTransfer === 0}
-                          onClick={() => setCashTransferOpen((open) => !open)}
-                          className="h-14 shrink-0 rounded-xl bg-zinc-900 px-4 text-sm font-bold text-white disabled:opacity-50">
-                          OTP
-                        </button>
-                      )}
                       </div>
                     ))}
-                    {cashTransferOpen && (
-                      <div className="grid gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 grid-cols-2 xl:grid-cols-[minmax(0,1fr)_auto_auto] xl:items-end">
-                        <label className="col-span-2 min-w-0 text-sm font-bold text-zinc-700 xl:col-span-1">
-                          Iznos prenosa na OTP (€)
-                          <input form="cash-transfer-form" name="transferAmount" type="number" inputMode="decimal" required min="0.01" max={maxCashTransfer} step="0.01" disabled={budgetSaving}
-                            className="mt-1 block h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-base" />
-                        </label>
-                        <button type="button" disabled={budgetSaving} onClick={() => setCashTransferOpen(false)} className="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm font-semibold">Otkaži</button>
-                        <button form="cash-transfer-form" type="submit" disabled={budgetSaving || maxCashTransfer === 0} className="min-h-11 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">{budgetSaving ? "Čuvanje…" : "Prenesi"}</button>
-                      </div>
-                    )}
-                    <p className="rounded-lg bg-[#f4f5f7] px-3 py-3 text-xs text-[#686b70] sm:col-span-2">NLB raspoloživo se računa automatski: uneseno stanje minus 1.300 €.</p>
                   </form>
-                  <form id="cash-transfer-form" onSubmit={transferCashToOtp} />
                   <div className="grid gap-3 border-t border-[#e7e8ea] pt-4 md:grid-cols-2">
                     <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} onAddToCash={addToCash} />
                     <PlannedItemsCard title="Očekivani troškovi" subtitle="Umanjuju izabrani mjesečni limit" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} />
@@ -624,9 +648,60 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                 </section>
               )}
               {budgetMessage && <p role="status" className="col-span-2 text-sm">{budgetMessage}</p>}
-              <SummaryCard title="OTP kartica" value={`${otpBalance < 0 ? "−" : ""}${formatMoney(otpBalance)} €`} icon={<Landmark size={18} />} trend="Stanje na računu" />
-              <SummaryCard title="NLB kartica" value={`${nlbAvailable < 0 ? "−" : ""}${formatMoney(nlbAvailable)} €`} icon={<Landmark size={18} />} trend="NLB − 1.300 €" />
-              <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<WalletCards size={18} />} trend="Gotovina" />
+              <SummaryCard title="OTP kartica" value={`${otpBalance < 0 ? "−" : ""}${formatMoney(otpBalance)} €`} icon={<Landmark size={18} />} trend="Stanje na računu"
+                onClick={() => toggleQuickBalanceEditor("otp", otpBalance)} expanded={quickBalanceField === "otp"}
+                editor={quickBalanceField === "otp" ? (
+                  <form onSubmit={saveQuickBalance} className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_auto] items-end gap-2">
+                    <label className="min-w-0 text-[11px] font-semibold text-zinc-700 sm:text-sm">Novo stanje (€)
+                      <input name="balance" type="number" inputMode="decimal" required min={-deductions.otp} max={9_999_999_999.99 - deductions.otp} step="0.01" value={quickBalanceValue} onChange={(event) => setQuickBalanceValue(event.target.value)} autoFocus disabled={budgetSaving}
+                        className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" />
+                    </label>
+                    <button type="submit" disabled={budgetSaving} className="min-h-11 rounded-xl bg-zinc-900 px-3 text-xs font-bold text-white disabled:opacity-50 sm:min-h-12 sm:px-4 sm:text-sm">{budgetSaving ? "Čuvanje…" : "Sačuvaj"}</button>
+                    <button type="button" onClick={() => setQuickBalanceField(null)} disabled={budgetSaving} className="min-h-11 rounded-xl border border-zinc-200 px-3 text-xs font-bold disabled:opacity-50 sm:min-h-12 sm:px-4 sm:text-sm">Otkaži</button>
+                  </form>
+                ) : undefined} />
+              <SummaryCard title="NLB kartica" value={`${nlbAvailable < 0 ? "−" : ""}${formatMoney(nlbAvailable)} €`} icon={<Landmark size={18} />} trend="NLB − 1.300 €"
+                onClick={() => toggleQuickBalanceEditor("nlb", budget.nlb)} expanded={quickBalanceField === "nlb"}
+                editor={quickBalanceField === "nlb" ? (
+                  <form onSubmit={saveQuickBalance} className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_auto] items-end gap-2">
+                    <label className="min-w-0 text-[11px] font-semibold text-zinc-700 sm:text-sm">Ukupno stanje (€)
+                      <input name="balance" type="number" inputMode="decimal" required min="0" max="9999999999.99" step="0.01" value={quickBalanceValue} onChange={(event) => setQuickBalanceValue(event.target.value)} autoFocus disabled={budgetSaving}
+                        className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" />
+                    </label>
+                    <button type="submit" disabled={budgetSaving} className="min-h-11 rounded-xl bg-zinc-900 px-3 text-xs font-bold text-white disabled:opacity-50 sm:min-h-12 sm:px-4 sm:text-sm">{budgetSaving ? "Čuvanje…" : "Sačuvaj"}</button>
+                    <button type="button" onClick={() => setQuickBalanceField(null)} disabled={budgetSaving} className="min-h-11 rounded-xl border border-zinc-200 px-3 text-xs font-bold disabled:opacity-50 sm:min-h-12 sm:px-4 sm:text-sm">Otkaži</button>
+                  </form>
+                ) : undefined} />
+              <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<WalletCards size={18} />} trend="Gotovina"
+                onClick={() => toggleQuickBalanceEditor("cash", budget.cash)} expanded={quickBalanceField === "cash"}
+                editor={quickBalanceField === "cash" ? (
+                  <>
+                    <form onSubmit={saveQuickBalance} className="mt-3">
+                      <label className="min-w-0 text-[11px] font-semibold text-zinc-700 sm:text-sm">Novi iznos (€)
+                        <input name="balance" type="number" inputMode="decimal" required min="0" max="9999999999.99" step="0.01" value={quickBalanceValue} onChange={(event) => setQuickBalanceValue(event.target.value)} autoFocus disabled={budgetSaving}
+                          className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" />
+                      </label>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <button type="submit" disabled={budgetSaving} className="min-h-10 rounded-xl bg-zinc-900 px-2 text-xs font-bold text-white disabled:opacity-50">{budgetSaving ? "Čuvanje…" : "Sačuvaj"}</button>
+                        <button type="button" onClick={() => { setQuickBalanceField(null); setCashTransferOpen(false); }} disabled={budgetSaving} className="min-h-10 rounded-xl border border-zinc-200 px-2 text-xs font-bold disabled:opacity-50">Otkaži</button>
+                        <button type="button" aria-label="Otvori prenos keša na OTP" aria-expanded={cashTransferOpen} onClick={() => setCashTransferOpen((open) => !open)} disabled={budgetSaving || maxCashTransfer === 0}
+                          className="col-span-2 min-h-10 rounded-xl bg-emerald-700 px-2 text-xs font-bold text-white disabled:opacity-50">Prenesi dio keša na OTP</button>
+                      </div>
+                    </form>
+                    {cashTransferOpen && (
+                      <form onSubmit={transferCashToOtp} className="mt-3 space-y-2 rounded-xl bg-zinc-50 p-3">
+                        <label className="block text-[11px] font-semibold text-zinc-700 sm:text-sm">Iznos prenosa na OTP (€)
+                          <input name="transferAmount" type="number" inputMode="decimal" required min="0.01" max={maxCashTransfer} step="0.01" disabled={budgetSaving} autoFocus
+                            className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:px-3 sm:text-sm" />
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button type="button" onClick={() => setCashTransferOpen(false)} disabled={budgetSaving} className="min-h-10 rounded-xl border border-zinc-200 px-2 text-xs font-bold disabled:opacity-50">Otkaži</button>
+                          <button type="submit" disabled={budgetSaving || maxCashTransfer === 0} className="min-h-10 rounded-xl bg-emerald-700 px-2 text-xs font-bold text-white disabled:opacity-50">{budgetSaving ? "Čuvanje…" : "Prenesi"}</button>
+                        </div>
+                      </form>
+                    )}
+                  </>
+                ) : undefined} />
               <SummaryCard title="Dodaci" value={`${formatMoney(additionsTotal)} €`} icon={<ArrowDownLeft size={18} />} trend="Sigurni budući prilivi" onClick={() => openPlannedDetails("addition")} />
               <SummaryCard title="Mjesečni troškovi" value={`${formatMoney(monthlyExpensesTotal)} €`} icon={<Target size={18} />} trend={`${formatMoney(fixedExpensesTotal)} € fiksni + ${formatMoney(subscriptionsTotal)} € pretplate`} />
               <SummaryCard title="Očekivani troškovi" value={`${formatMoney(expectedExpensesTotal)} €`} icon={<ArrowUpRight size={18} />} trend="Umanjuju mjesečne limite" onClick={() => openPlannedDetails("expectedExpense")} />
@@ -904,6 +979,8 @@ interface SummaryCardProps {
   trend: string;
   featured?: boolean;
   onClick?: () => void;
+  expanded?: boolean;
+  editor?: React.ReactNode;
 }
 
 interface PlannedItemsCardProps {
@@ -928,50 +1005,57 @@ function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, savin
     <div className="rounded-xl border border-[#e7e8ea] bg-white p-4 md:p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-bold">{title}</h2>
-          <p className="mt-1 text-xs text-[#8d9196]">{subtitle}</p>
+          <h2 className="text-base font-bold sm:text-lg">{title}</h2>
+          <p className="mt-1 text-sm text-[#8d9196]">{subtitle}</p>
         </div>
-        <button type="button" onClick={onToggleForm} className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[#dfe1e3] px-3 text-xs font-bold">
-          <Plus size={15} /> {formOpen ? "Otkaži" : "Dodaj"}
+        <button type="button" onClick={onToggleForm} className="flex h-11 shrink-0 items-center gap-2 rounded-lg border border-[#dfe1e3] px-4 text-sm font-bold">
+          <Plus size={18} /> {formOpen ? "Otkaži" : "Dodaj"}
         </button>
       </div>
 
       {formOpen && (
-        <form onSubmit={(event) => onSubmit(event, kind)} className="mt-4 grid grid-cols-[1fr_110px] gap-2 rounded-xl bg-[#f5f6f7] p-3">
-          <input name="description" required maxLength={120} placeholder="Opis" aria-label={`Opis za ${title.toLowerCase()}`} className="h-10 min-w-0 rounded-lg border border-[#dfe1e3] bg-white px-3 text-sm outline-none focus:border-[#919b93]" />
-          <input name="amount" required type="number" min="0.01" max="9999999999.99" step="0.01" placeholder="Iznos €" aria-label={`Iznos za ${title.toLowerCase()}`} className="h-11 min-w-0 rounded-lg border border-[#cfd3d6] bg-white px-3 text-base font-bold outline-none focus:border-[#6f8173]" />
+        <form onSubmit={(event) => onSubmit(event, kind)} className="mt-4 grid grid-cols-[1fr_120px] gap-2 rounded-xl bg-[#f5f6f7] p-3 sm:p-4">
+          <input name="description" required maxLength={120} placeholder="Opis" aria-label={`Opis za ${title.toLowerCase()}`} className="h-11 min-w-0 rounded-lg border border-[#dfe1e3] bg-white px-3 text-base outline-none focus:border-[#919b93]" />
+          <input name="amount" required type="number" min="0.01" max="9999999999.99" step="0.01" placeholder="Iznos €" aria-label={`Iznos za ${title.toLowerCase()}`} className="h-12 min-w-0 rounded-lg border border-[#cfd3d6] bg-white px-3 text-lg font-bold outline-none focus:border-[#6f8173]" />
           {kind === "expectedExpense" ? (
-            <label className="col-span-2 text-xs font-semibold text-zinc-600">Umanji limit nakon čuvanja stavke
-              <select name="expenseCategory" required defaultValue="" className="mt-1.5 h-11 w-full rounded-lg border border-[#cfd3d6] bg-white px-3 text-[16px] font-semibold outline-none focus:border-[#6f8173] sm:text-sm">
+            <label className="col-span-2 text-sm font-semibold text-zinc-600">Umanji limit nakon čuvanja stavke
+              <select name="expenseCategory" required defaultValue="" className="mt-1.5 h-12 w-full rounded-lg border border-[#cfd3d6] bg-white px-3 text-base font-semibold outline-none focus:border-[#6f8173]">
                 <option value="" disabled>Izaberite vrstu troška</option>
                 <option value="household">Kućni troškovi</option>
                 <option value="personal">Lični troškovi</option>
               </select>
             </label>
           ) : null}
-          <button disabled={saving} className="col-span-2 h-10 rounded-lg bg-[#202124] text-xs font-bold text-white disabled:opacity-60">{saving ? "Čuvanje..." : "Sačuvaj stavku"}</button>
+          <button disabled={saving} className="col-span-2 h-12 rounded-lg bg-[#202124] text-sm font-bold text-white disabled:opacity-60">{saving ? "Čuvanje..." : "Sačuvaj stavku"}</button>
         </form>
       )}
 
-      <div className="mt-4 divide-y divide-[#eff0f1]">
+      <div className="mt-5 divide-y divide-[#eff0f1]">
         {visibleItems.length === 0 ? (
-          <p className="py-4 text-sm text-[#9a9da2]">Još nema unesenih stavki.</p>
+          <p className="py-5 text-base text-[#9a9da2]">Još nema unesenih stavki.</p>
         ) : visibleItems.map((item) => (
-          <form key={item.id} onSubmit={(event) => onEdit(event, item)} className={cn("grid items-end gap-1.5 py-2", onAddToCash ? "grid-cols-[minmax(0,1fr)_68px_repeat(3,36px)] sm:grid-cols-[minmax(0,1fr)_90px_repeat(3,40px)]" : "grid-cols-[minmax(0,1fr)_82px_38px_38px] sm:grid-cols-[minmax(0,1fr)_110px_40px_40px]")}>
-            <label className="min-w-0 text-[11px] font-semibold text-zinc-600">Opis<input name="description" required maxLength={120} defaultValue={item.description} className="mt-1 h-10 w-full min-w-0 rounded-lg border border-zinc-200 px-2 text-[16px] font-medium outline-none focus:border-emerald-600 sm:text-sm" /></label>
-            <label className="min-w-0 text-[11px] font-semibold text-zinc-600">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" max="9999999999.99" step="0.01" defaultValue={item.amount} className="mt-1 h-10 w-full min-w-0 rounded-lg border border-zinc-200 px-2 text-[16px] font-bold outline-none focus:border-emerald-600 sm:text-sm" /></label>
-            <button disabled={saving} aria-label={`Sačuvaj ${item.description}`} title="Sačuvaj" className="grid h-10 w-9 place-items-center rounded-lg border border-zinc-200 text-zinc-700 transition active:scale-95 disabled:opacity-50 sm:w-10"><Save size={16} /></button>
-            {onAddToCash && <button type="button" onClick={() => onAddToCash(item)} disabled={saving} aria-label={`Dodaj u keš: ${item.description}`} title="Dodaj u keš"
-              className="grid h-10 w-9 place-items-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 sm:w-10"><WalletCards size={16} aria-hidden /></button>}
-            <button type="button" onClick={() => onDelete(item)} disabled={saving} aria-label={`Ukloni ${item.description}`} title="Ukloni stavku" className="grid h-10 w-9 shrink-0 place-items-center rounded-lg border border-zinc-200 text-[#8b8e93] hover:bg-red-50 hover:text-red-600 disabled:opacity-50 sm:w-10">
-              <Trash2 size={15} />
-            </button>
+          <form key={item.id} onSubmit={(event) => onEdit(event, item)} className={cn(
+            "grid grid-cols-2 items-end gap-x-2 gap-y-2 py-3 min-[360px]:gap-1",
+            onAddToCash
+              ? "min-[360px]:grid-cols-[minmax(0,1fr)_72px_repeat(3,40px)] sm:grid-cols-[minmax(0,1fr)_84px_repeat(3,40px)] md:grid-cols-[minmax(0,1fr)_72px_repeat(3,40px)] lg:grid-cols-[minmax(0,1fr)_96px_repeat(3,44px)]"
+              : "min-[360px]:grid-cols-[minmax(0,1fr)_76px_40px_40px] sm:grid-cols-[minmax(0,1fr)_88px_40px_40px] md:grid-cols-[minmax(0,1fr)_76px_40px_40px] lg:grid-cols-[minmax(0,1fr)_96px_44px_44px]",
+          )}>
+            <label className="min-w-0 text-[10px] font-semibold text-zinc-600 sm:text-xs">Opis<input name="description" required maxLength={120} defaultValue={item.description} className="mt-1 h-10 w-full min-w-0 rounded-lg border border-zinc-200 px-1.5 text-sm font-medium outline-none focus:border-emerald-600 sm:px-2 sm:text-base" /></label>
+            <label className="min-w-0 text-[10px] font-semibold text-zinc-600 sm:text-xs">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" max="9999999999.99" step="0.01" defaultValue={item.amount} className="mt-1 h-10 w-full min-w-0 rounded-lg border border-zinc-200 px-1.5 text-sm font-bold outline-none focus:border-emerald-600 sm:px-2 sm:text-base" /></label>
+            <div className={cn("col-span-2 flex items-center justify-end gap-1", onAddToCash ? "min-[360px]:col-span-3" : "min-[360px]:col-span-2")}>
+              <button disabled={saving} aria-label={`Sačuvaj ${item.description}`} title="Sačuvaj" className="grid h-10 w-10 place-items-center rounded-lg border border-zinc-200 text-zinc-700 transition active:scale-95 disabled:opacity-50 lg:h-11 lg:w-11"><Save size={18} /></button>
+              {onAddToCash && <button type="button" onClick={() => onAddToCash(item)} disabled={saving} aria-label={`Dodaj u keš: ${item.description}`} title="Dodaj u keš"
+                className="grid h-10 w-10 place-items-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 lg:h-11 lg:w-11"><WalletCards size={18} aria-hidden /></button>}
+              <button type="button" onClick={() => onDelete(item)} disabled={saving} aria-label={`Ukloni ${item.description}`} title="Ukloni stavku" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-zinc-200 text-[#8b8e93] hover:bg-red-50 hover:text-red-600 disabled:opacity-50 lg:h-11 lg:w-11">
+                <Trash2 size={17} />
+              </button>
+            </div>
             {item.kind === "expectedExpense" ? (
-              <label className="col-span-2 text-[11px] font-semibold text-zinc-600">Umanjiti
-                <select name="expenseCategory" required defaultValue={item.expenseCategory ?? ""} className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-[16px] font-semibold outline-none focus:border-emerald-600 sm:text-sm">
+              <label className="col-span-full text-[10px] font-semibold text-zinc-600 sm:text-xs">Umanjiti
+                <select name="expenseCategory" required defaultValue={item.expenseCategory ?? ""} className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm font-semibold outline-none focus:border-emerald-600 sm:text-base">
                   <option value="" disabled>Izaberite</option>
                   <option value="household">Kućne troškove</option>
-                  <option value="personal">Lične troškove</option>
+                  <option value="personal">Lični troškovi</option>
                 </select>
               </label>
             ) : null}
@@ -979,36 +1063,40 @@ function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, savin
         ))}
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-[#e7e8ea] pt-3 text-sm">
+      <div className="mt-4 flex items-center justify-between border-t border-[#e7e8ea] pt-4 text-base">
         <span className="font-semibold text-[#777b82]">Ukupno</span>
-        <strong className="text-lg">{formatMoney(total)} €</strong>
+        <strong className="text-xl">{formatMoney(total)} €</strong>
       </div>
     </div>
   );
 }
 
-function SummaryCard({ title, value, icon, tone, trend, featured = false, onClick }: SummaryCardProps) {
+function SummaryCard({ title, value, icon, tone, trend, featured = false, onClick, expanded, editor }: SummaryCardProps) {
   const colored = Boolean(tone);
   return (
-    <div className={cn(
-      "relative min-h-[116px] min-w-0 rounded-2xl border p-3.5 shadow-[0_2px_12px_rgba(24,24,27,0.035)] transition sm:min-h-[132px] sm:p-5",
-      featured && "min-h-[142px]",
-      !tone && "border-zinc-200/80 bg-white",
-      tone === "dark" && "border-zinc-800 bg-zinc-900 text-white shadow-lg shadow-zinc-900/10",
-      tone === "danger" && "border-rose-700 bg-rose-700 text-white shadow-lg shadow-rose-900/10",
-      tone === "success" && "border-emerald-700 bg-emerald-700 text-white shadow-lg shadow-emerald-900/10",
-      tone === "info" && "border-blue-700 bg-blue-700 text-white shadow-lg shadow-blue-900/10",
-    )}>
-      <div className="flex items-center justify-between">
-        <p className={cn("text-[10px] font-semibold leading-tight sm:text-[12px]", colored ? "text-white/80" : "text-zinc-500")}>{title}</p>
-        <div className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg sm:h-8 sm:w-8", colored ? "bg-white/10 text-white" : "bg-zinc-100 text-zinc-500")}>{icon}</div>
+    <div className="min-w-0">
+      <div className={cn(
+        "relative min-h-[116px] min-w-0 rounded-2xl border p-3.5 shadow-[0_2px_12px_rgba(24,24,27,0.035)] transition sm:min-h-[132px] sm:p-5",
+        featured && "min-h-[142px]",
+        !tone && "border-zinc-200/80 bg-white",
+        tone === "dark" && "border-zinc-800 bg-zinc-900 text-white shadow-lg shadow-zinc-900/10",
+        tone === "danger" && "border-rose-700 bg-rose-700 text-white shadow-lg shadow-rose-900/10",
+        tone === "success" && "border-emerald-700 bg-emerald-700 text-white shadow-lg shadow-emerald-900/10",
+        tone === "info" && "border-blue-700 bg-blue-700 text-white shadow-lg shadow-blue-900/10",
+      )}>
+        <div className="flex items-center justify-between">
+          <p className={cn("text-[10px] font-semibold leading-tight sm:text-[12px]", colored ? "text-white/80" : "text-zinc-500")}>{title}</p>
+          <div className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg sm:h-8 sm:w-8", colored ? "bg-white/10 text-white" : "bg-zinc-100 text-zinc-500")}>{icon}</div>
+        </div>
+        <div className="mt-3 sm:mt-5">
+          <p className={cn("font-bold tracking-tight [overflow-wrap:anywhere]", featured ? "text-[20px] sm:text-[30px]" : "text-[17px] sm:text-[23px]")}>{value}</p>
+          <span className={cn("mt-1 block min-h-4 text-[9px] font-bold leading-tight sm:text-[10px]", colored ? "text-white/80" : "text-emerald-700")}>{trend}</span>
+        </div>
+        {onClick && <button type="button" aria-label={expanded === undefined ? `Prikaži detalje: ${title}` : `Uredi ${title}`}
+          aria-expanded={expanded} aria-haspopup={expanded === undefined ? "dialog" : undefined}
+          onClick={onClick} className="absolute inset-0 cursor-pointer rounded-2xl hover:bg-zinc-900/5 focus-visible:outline-2 focus-visible:outline-emerald-600" />}
       </div>
-      <div className="mt-3 sm:mt-5">
-        <p className={cn("font-bold tracking-tight [overflow-wrap:anywhere]", featured ? "text-[20px] sm:text-[30px]" : "text-[17px] sm:text-[23px]")}>{value}</p>
-        <span className={cn("mt-1 block min-h-4 text-[9px] font-bold leading-tight sm:text-[10px]", colored ? "text-white/80" : "text-emerald-700")}>{trend}</span>
-      </div>
-      {onClick && <button type="button" aria-label={`Prikaži detalje: ${title}`} aria-haspopup="dialog"
-        onClick={onClick} className="absolute inset-0 cursor-pointer rounded-2xl hover:bg-zinc-900/5 focus-visible:outline-2 focus-visible:outline-emerald-600" />}
+      {editor}
     </div>
   );
 }
