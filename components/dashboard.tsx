@@ -651,25 +651,29 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
               <SummaryCard title="OTP kartica" value={`${otpBalance < 0 ? "−" : ""}${formatMoney(otpBalance)} €`} icon={<Landmark size={18} />} trend="Stanje na računu"
                 onClick={() => toggleQuickBalanceEditor("otp", otpBalance)} expanded={quickBalanceField === "otp"}
                 editor={quickBalanceField === "otp" ? (
-                  <form onSubmit={saveQuickBalance} className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_auto] items-end gap-2">
-                    <label className="min-w-0 text-[11px] font-semibold text-zinc-700 sm:text-sm">Novo stanje (€)
+                  <form onSubmit={saveQuickBalance} className="mt-3">
+                    <label className="block min-w-0 text-[11px] font-semibold text-zinc-700 sm:text-sm">Novo stanje (€)
                       <input name="balance" type="number" inputMode="decimal" required min={-deductions.otp} max={9_999_999_999.99 - deductions.otp} step="0.01" value={quickBalanceValue} onChange={(event) => setQuickBalanceValue(event.target.value)} autoFocus disabled={budgetSaving}
                         className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" />
                     </label>
-                    <button type="submit" disabled={budgetSaving} className="min-h-11 rounded-xl bg-zinc-900 px-3 text-xs font-bold text-white disabled:opacity-50 sm:min-h-12 sm:px-4 sm:text-sm">{budgetSaving ? "Čuvanje…" : "Sačuvaj"}</button>
-                    <button type="button" onClick={() => setQuickBalanceField(null)} disabled={budgetSaving} className="min-h-11 rounded-xl border border-zinc-200 px-3 text-xs font-bold disabled:opacity-50 sm:min-h-12 sm:px-4 sm:text-sm">Otkaži</button>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <button type="submit" disabled={budgetSaving} className="min-h-10 rounded-xl bg-zinc-900 px-2 text-xs font-bold text-white disabled:opacity-50">{budgetSaving ? "Čuvanje…" : "Sačuvaj"}</button>
+                      <button type="button" onClick={() => setQuickBalanceField(null)} disabled={budgetSaving} className="min-h-10 rounded-xl border border-zinc-200 px-2 text-xs font-bold disabled:opacity-50">Otkaži</button>
+                    </div>
                   </form>
                 ) : undefined} />
               <SummaryCard title="NLB kartica" value={`${nlbAvailable < 0 ? "−" : ""}${formatMoney(nlbAvailable)} €`} icon={<Landmark size={18} />} trend="NLB − 1.300 €"
                 onClick={() => toggleQuickBalanceEditor("nlb", budget.nlb)} expanded={quickBalanceField === "nlb"}
                 editor={quickBalanceField === "nlb" ? (
-                  <form onSubmit={saveQuickBalance} className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_auto] items-end gap-2">
-                    <label className="min-w-0 text-[11px] font-semibold text-zinc-700 sm:text-sm">Ukupno stanje (€)
+                  <form onSubmit={saveQuickBalance} className="mt-3">
+                    <label className="block min-w-0 text-[11px] font-semibold text-zinc-700 sm:text-sm">Ukupno stanje (€)
                       <input name="balance" type="number" inputMode="decimal" required min="0" max="9999999999.99" step="0.01" value={quickBalanceValue} onChange={(event) => setQuickBalanceValue(event.target.value)} autoFocus disabled={budgetSaving}
                         className="mt-2 h-11 w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-2 text-[16px] outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-50 sm:h-12 sm:px-3 sm:text-sm" />
                     </label>
-                    <button type="submit" disabled={budgetSaving} className="min-h-11 rounded-xl bg-zinc-900 px-3 text-xs font-bold text-white disabled:opacity-50 sm:min-h-12 sm:px-4 sm:text-sm">{budgetSaving ? "Čuvanje…" : "Sačuvaj"}</button>
-                    <button type="button" onClick={() => setQuickBalanceField(null)} disabled={budgetSaving} className="min-h-11 rounded-xl border border-zinc-200 px-3 text-xs font-bold disabled:opacity-50 sm:min-h-12 sm:px-4 sm:text-sm">Otkaži</button>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <button type="submit" disabled={budgetSaving} className="min-h-10 rounded-xl bg-zinc-900 px-2 text-xs font-bold text-white disabled:opacity-50">{budgetSaving ? "Čuvanje…" : "Sačuvaj"}</button>
+                      <button type="button" onClick={() => setQuickBalanceField(null)} disabled={budgetSaving} className="min-h-10 rounded-xl border border-zinc-200 px-2 text-xs font-bold disabled:opacity-50">Otkaži</button>
+                    </div>
                   </form>
                 ) : undefined} />
               <SummaryCard title="Keš" value={`${formatMoney(budget.cash)} €`} icon={<WalletCards size={18} />} trend="Gotovina"
