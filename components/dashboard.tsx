@@ -184,6 +184,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   }
   const { confirmRemoval, confirmation } = useConfirmation();
   const [draftBudget, setDraftBudget] = useState(initialBudget);
+  const [emptyBudgetFields, setEmptyBudgetFields] = useState<Partial<Record<keyof BudgetSettings, boolean>>>({});
   const [editingBudget, setEditingBudget] = useState(false);
   const [cashTransferOpen, setCashTransferOpen] = useState(false);
   const [budgetSaving, setBudgetSaving] = useState(false);
@@ -220,6 +221,8 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   async function transferCashToOtp(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (budgetSaving || plannedItemSaving) return;
+    const budgetForm = document.getElementById("budget-settings-form");
+    if (budgetForm instanceof HTMLFormElement && !budgetForm.reportValidity()) return;
     const amount = Number(new FormData(event.currentTarget).get("transferAmount"));
     if (!Number.isFinite(amount) || amount < 0.01 || amount > maxCashTransfer) return;
 
@@ -553,7 +556,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                   <button
                     type={editingBudget ? "submit" : "button"}
                     form={editingBudget ? "budget-settings-form" : undefined}
-                    onClick={editingBudget ? undefined : (event) => { event.preventDefault(); setDraftBudget(budget); setEditingBudget(true); setBudgetMessage(""); }}
+                    onClick={editingBudget ? undefined : (event) => { event.preventDefault(); setDraftBudget(budget); setEmptyBudgetFields({}); setEditingBudget(true); setBudgetMessage(""); }}
                     disabled={budgetSaving || plannedItemSaving}
                     className={cn("min-h-12 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition disabled:opacity-60", editingBudget ? "bg-[#31724a] text-white hover:bg-[#285f3e]" : "bg-[#202124] text-white hover:bg-[#34363a]")}
                   >
@@ -588,8 +591,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                           <div key={key} className="flex items-end gap-2">
                           <label className="min-w-0 flex-1 text-sm font-bold text-[#555a60]">
                             {label} (€)
-                            <input name={key} type="number" required min={-deductions[key]} max={9999999999.99 - deductions[key]} step="0.01" value={Math.round((draftBudget[key] - deductions[key]) * 100) / 100} onChange={(event) => {
-                              const amount = Number(event.target.value);
+                            <input name={key} type="number" inputMode="decimal" required min={-deductions[key]} max={9999999999.99 - deductions[key]} step="0.01" value={emptyBudgetFields[key] ? "" : Math.round((draftBudget[key] - deductions[key]) * 100) / 100} onChange={(event) => {
+                              const amount = event.currentTarget.valueAsNumber;
+                              const isEmpty = event.currentTarget.value === "";
+                              setEmptyBudgetFields((current) => ({ ...current, [key]: isEmpty }));
+                              if (!Number.isFinite(amount)) return;
                               setDraftBudget((current) => ({ ...current, [key]: Math.round((amount + deductions[key]) * 100) / 100 }));
                             }} disabled={budgetSaving} className="mt-2 h-14 w-full rounded-xl border-2 border-[#cfd3d6] px-4 text-xl font-extrabold tracking-tight outline-none focus:border-[#6f8173]" />
                           </label>
