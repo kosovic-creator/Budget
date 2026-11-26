@@ -173,6 +173,27 @@ export async function updatePlannedItem(input: { id: string; description: string
   }
 }
 
+export async function moveAdditionToCash(id: string) {
+  if (!(await auth.api.getSession({ headers: await headers() }))) {
+    return { success: false as const, message: "Sesija je istekla. Prijavite se ponovo." };
+  }
+  try {
+    const cash = await prisma.$transaction(async (tx) => {
+      const item = await tx.plannedItem.delete({ where: { id, kind: "ADDITION" } });
+      const budget = await tx.budgetSettings.upsert({
+        where: { id: "default" },
+        create: { id: "default", cash: item.amount },
+        update: { cash: { increment: item.amount } },
+      });
+      return Number(budget.cash);
+    });
+    return { success: true as const, cash };
+  } catch (error) {
+    console.error("Neuspješan prenos dodatka u keš.", error);
+    return { success: false as const, message: "Dodatak nije prenesen. Osvježite stranicu i pokušajte ponovo." };
+  }
+}
+
 export async function deletePlannedItem(id: string) {
   if (!(await auth.api.getSession({ headers: await headers() }))) {
     return { success: false as const, message: "Sesija je istekla. Prijavite se ponovo." };

@@ -23,7 +23,8 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 90,
     updateAge: 60 * 60 * 24,
-    cookieCache: { enabled: true, maxAge: 5 * 60 },
+    // Profile images are stored on the user record and can exceed cookie header limits.
+    cookieCache: { enabled: false },
   },
   hooks: {
     before: createAuthMiddleware(async (context) => {
