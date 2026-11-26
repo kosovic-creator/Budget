@@ -11,7 +11,7 @@ Mobilno prilagođen Next.js pregled ličnih finansija. Transakcije se čuvaju u 
    ```
 
 2. Napravite `.env` kopiranjem `.env.example` i unesite Neon konekcione stringove:
-   - `DATABASE_URL` za aplikaciju (preporučeno pooled URL)
+   - `DATABASE_URL` za aplikaciju (preporučeno pooled URL).
    - `DIRECT_URL` je opcionalan; koristi se za Prisma DB komande
 
 3. Generišite Prisma Client i uskladite tabelu sa šemom:
