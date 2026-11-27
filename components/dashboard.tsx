@@ -646,9 +646,9 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                   }
                 }}
                 disabled={budgetSaving || plannedItemSaving}
-                className={cn("min-h-11 rounded-xl px-2.5 py-2 text-xs sm:px-4 sm:text-sm font-bold shadow-sm transition disabled:opacity-60", editingBudget ? "bg-[#31724a] text-white hover:bg-[#285f3e]" : "bg-[#202124] text-white hover:bg-[#34363a]")}
+                className={cn("min-h-11 rounded-xl px-2 py-2 text-[10px] leading-tight font-bold shadow-sm transition disabled:opacity-60 sm:px-4 sm:text-sm", editingBudget ? "bg-[#31724a] text-white hover:bg-[#285f3e]" : "bg-[#202124] text-white hover:bg-[#34363a]")}
               >
-                {editingBudget ? "Završi unos" : "Dodaci i Rezervisani Troškovi"}
+                {editingBudget ? "Završi unos" : "Dodaci i rezervacije"}
               </button>
             )}
             <button
