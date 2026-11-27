@@ -25,7 +25,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
-import { createPlannedItem, createTransaction, deletePlannedItem, deleteTransaction, moveAdditionToCash, saveBudget, updatePlannedItem } from "@/app/actions";
+import { createPlannedItem, createTransaction, deletePlannedItem, deleteTransaction, moveAdditionToCash, moveAdditionToOtp, saveBudget, updatePlannedItem } from "@/app/actions";
 import type {
   NewTransaction,
   Transaction,
@@ -442,6 +442,28 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
     }
   }
 
+  async function addToOtp(item: PlannedItem) {
+    if (budgetSaving || plannedItemSaving) return;
+    setPlannedItemSaving(true);
+    setPlannedItemMessage("");
+    setBudgetMessage("");
+    try {
+      const result = await moveAdditionToOtp(item.id);
+      if (!result.success) {
+        setPlannedItemMessage(result.message);
+        return;
+      }
+      setBudget((current) => ({ ...current, otp: result.otp }));
+      setDraftBudget((current) => ({ ...current, otp: Math.round((result.otp + current.otp - budget.otp) * 100) / 100 }));
+      setPlannedItems((current) => current.filter((entry) => entry.id !== item.id));
+      setBudgetMessage(`„${item.description}“ je prenesen na OTP (${formatMoney(item.amount)} €).`);
+    } catch {
+      setPlannedItemMessage("Prenos nije potvrđen. Osvježite stranicu prije ponovnog pokušaja.");
+    } finally {
+      setPlannedItemSaving(false);
+    }
+  }
+
   async function removePlannedItem(item: PlannedItem) {
     if (budgetSaving || plannedItemSaving) return;
     const result = await deletePlannedItem(item.id);
@@ -641,7 +663,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                     ))}
                   </form>
                   <div className="grid gap-3 border-t border-[#e7e8ea] pt-4 md:grid-cols-2">
-                    <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} onAddToCash={addToCash} />
+                    <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} onAddToCash={addToCash} onAddToOtp={addToOtp} />
                     <PlannedItemsCard title="Očekivani troškovi" subtitle="Umanjuju izabrani mjesečni limit" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} />
                   </div>
                   {plannedItemMessage && <p role="alert" className="rounded-xl bg-[#f7eeee] px-4 py-3 text-sm text-[#9b3d3d]">{plannedItemMessage}</p>}
@@ -1000,9 +1022,10 @@ interface PlannedItemsCardProps {
   onEdit: (event: React.FormEvent<HTMLFormElement>, item: PlannedItem) => Promise<void>;
   onDelete: (item: PlannedItem) => Promise<void>;
   onAddToCash?: (item: PlannedItem) => Promise<void>;
+  onAddToOtp?: (item: PlannedItem) => Promise<void>;
 }
 
-function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, saving, onToggleForm, onSubmit, onEdit, onDelete, onAddToCash }: PlannedItemsCardProps) {
+function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, saving, onToggleForm, onSubmit, onEdit, onDelete, onAddToCash, onAddToOtp }: PlannedItemsCardProps) {
   const visibleItems = items.filter((item) => item.kind === kind);
 
   return (
@@ -1048,11 +1071,13 @@ function PlannedItemsCard({ title, subtitle, kind, items, total, formOpen, savin
             <label className="min-w-0 text-[10px] font-semibold text-zinc-600 sm:text-xs">Iznos (€)<input name="amount" required type="number" inputMode="decimal" min="0.01" max="9999999999.99" step="0.01" defaultValue={item.amount} className="mt-1 h-10 w-full min-w-0 rounded-lg border border-zinc-200 px-1.5 text-sm font-bold outline-none focus:border-emerald-600 sm:px-2 sm:text-base" /></label>
             <div className={cn("col-span-2 flex items-center justify-end gap-1", onAddToCash ? "min-[360px]:col-span-3" : "min-[360px]:col-span-2")}>
               <button disabled={saving} aria-label={`Sačuvaj ${item.description}`} title="Sačuvaj" className="grid h-10 w-10 place-items-center rounded-lg border border-zinc-200 text-zinc-700 transition active:scale-95 disabled:opacity-50 lg:h-11 lg:w-11"><Save size={18} /></button>
-              {onAddToCash && <button type="button" onClick={() => onAddToCash(item)} disabled={saving} aria-label={`Dodaj u keš: ${item.description}`} title="Dodaj u keš"
+              {onAddToCash && <button type="button" onClick={() => onAddToCash(item)} disabled={saving} aria-label={`Pošalji u keš: ${item.description}`} title="Pošalji u keš"
                 className="grid h-10 w-10 place-items-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 lg:h-11 lg:w-11"><WalletCards size={18} aria-hidden /></button>}
-              <button type="button" onClick={() => onDelete(item)} disabled={saving} aria-label={`Ukloni ${item.description}`} title="Ukloni stavku" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-zinc-200 text-[#8b8e93] hover:bg-red-50 hover:text-red-600 disabled:opacity-50 lg:h-11 lg:w-11">
+              {onAddToOtp && <button type="button" onClick={() => onAddToOtp(item)} disabled={saving} aria-label={`Pošalji na OTP: ${item.description}`} title="Pošalji na OTP"
+                className="grid h-10 w-10 place-items-center rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-50 lg:h-11 lg:w-11"><Landmark size={18} aria-hidden /></button>}
+              {!onAddToCash && !onAddToOtp && <button type="button" onClick={() => onDelete(item)} disabled={saving} aria-label={`Ukloni ${item.description}`} title="Ukloni stavku" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-zinc-200 text-[#8b8e93] hover:bg-red-50 hover:text-red-600 disabled:opacity-50 lg:h-11 lg:w-11">
                 <Trash2 size={17} />
-              </button>
+              </button>}
             </div>
             {item.kind === "expectedExpense" ? (
               <label className="col-span-full text-[10px] font-semibold text-zinc-600 sm:text-xs">Umanjiti

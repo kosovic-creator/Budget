@@ -177,6 +177,9 @@ export async function moveAdditionToCash(id: string) {
   if (!(await auth.api.getSession({ headers: await headers() }))) {
     return { success: false as const, message: "Sesija je istekla. Prijavite se ponovo." };
   }
+  if (typeof id !== "string" || !id.trim()) {
+    return { success: false as const, message: "Stavka nije pronađena." };
+  }
   try {
     const cash = await prisma.$transaction(async (tx) => {
       const item = await tx.plannedItem.delete({ where: { id, kind: "ADDITION" } });
@@ -191,6 +194,40 @@ export async function moveAdditionToCash(id: string) {
   } catch (error) {
     console.error("Neuspješan prenos dodatka u keš.", error);
     return { success: false as const, message: "Dodatak nije prenesen. Osvježite stranicu i pokušajte ponovo." };
+  }
+}
+
+export async function moveAdditionToOtp(id: string) {
+  if (!(await auth.api.getSession({ headers: await headers() }))) {
+    return { success: false as const, message: "Sesija je istekla. Prijavite se ponovo." };
+  }
+  if (typeof id !== "string" || !id.trim()) {
+    return { success: false as const, message: "Stavka nije pronađena." };
+  }
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const item = await tx.plannedItem.findUnique({ where: { id, kind: "ADDITION" } });
+      if (!item) return { success: false as const, message: "Dodatak nije pronađen." };
+
+      const current = await tx.budgetSettings.findUnique({ where: { id: "default" } });
+      const currentCents = Math.round(Number(current?.otp ?? 0) * 100);
+      const amountCents = Math.round(Number(item.amount) * 100);
+      if (currentCents + amountCents > 999_999_999_999) {
+        return { success: false as const, message: "Prenos bi premašio najveće podržano stanje OTP računa." };
+      }
+
+      const budget = await tx.budgetSettings.upsert({
+        where: { id: "default" },
+        create: { id: "default", otp: item.amount },
+        update: { otp: { increment: item.amount } },
+      });
+      await tx.plannedItem.delete({ where: { id, kind: "ADDITION" } });
+      return { success: true as const, otp: Number(budget.otp) };
+    });
+    return result;
+  } catch (error) {
+    console.error("Neuspješan prenos dodatka na OTP.", error);
+    return { success: false as const, message: "Dodatak nije prenesen na OTP. Osvježite stranicu i pokušajte ponovo." };
   }
 }
 
