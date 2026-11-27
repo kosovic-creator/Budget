@@ -648,7 +648,7 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                 disabled={budgetSaving || plannedItemSaving}
                 className={cn("min-h-11 rounded-xl px-2.5 py-2 text-xs sm:px-4 sm:text-sm font-bold shadow-sm transition disabled:opacity-60", editingBudget ? "bg-[#31724a] text-white hover:bg-[#285f3e]" : "bg-[#202124] text-white hover:bg-[#34363a]")}
               >
-                {editingBudget ? "Završi unos" : <><span className="sm:hidden">Unos plana</span><span className="hidden sm:inline">Unos stanja i plana</span></>}
+                {editingBudget ? "Završi unos" : "Dodaci i Rezervisani Troškovi"}
               </button>
             )}
             <button
@@ -752,20 +752,25 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                 </div>
                 <div className="mt-4 space-y-4 md:mt-5 md:space-y-5">
                   {([
-                    ["Kućni troškovi", budget.household, "#7e927f"],
-                    ["Lični troškovi", budget.personal, "#b9a578"],
-                  ] as const).map(([label, total, color]) => {
+                    { label: "Kućni troškovi", field: "household", color: "#7e927f" },
+                    { label: "Lični troškovi", field: "personal", color: "#b9a578" },
+                  ] as const).map(({ label, field, color }) => {
                     const spent = Math.abs(transactions.filter(item => item.type === "expense" && item.category === label).reduce((sum, item) => sum + item.amount, 0));
-                    const field = label === "Kućni troškovi" ? "household" : "personal";
+                    const reserved = plannedItems
+                      .filter((item) => item.kind === "expectedExpense" && item.expenseCategory === field)
+                      .reduce((sum, item) => sum + item.amount, 0);
+                    const total = budget[field] + reserved;
                     return (
                       <BudgetRow
                         key={label}
                         label={label}
                         spent={spent}
+                        reserved={reserved}
+                        showReserved
                         total={total}
-                        percent={total > 0 ? Math.min(100, spent / total * 100) : 0}
+                        percent={total > 0 ? Math.min(100, (spent + reserved) / total * 100) : 0}
                         color={color}
-                        onEdit={() => toggleLimitEditor(field, total - spent)}
+                        onEdit={() => toggleLimitEditor(field, budget[field] - spent)}
                         expanded={editingLimitField === field}
                         editor={editingLimitField === field ? (
                           <form onSubmit={saveLimit} className="mt-3 rounded-xl bg-zinc-50 p-3">
@@ -1166,6 +1171,8 @@ function SummaryCard({ title, value, icon, tone, trend, featured = false, onClic
 interface BudgetRowProps {
   label: string;
   spent: number;
+  reserved?: number;
+  showReserved?: boolean;
   total: number;
   percent: number;
   color: string;
@@ -1174,9 +1181,10 @@ interface BudgetRowProps {
   editor?: React.ReactNode;
 }
 
-function BudgetRow({ label, spent, total, percent, color, onEdit, expanded, editor }: BudgetRowProps) {
-  const remaining = Math.max(0, total - spent);
-  const exceeded = Math.max(0, spent - total);
+function BudgetRow({ label, spent, reserved = 0, showReserved = false, total, percent, color, onEdit, expanded, editor }: BudgetRowProps) {
+  const committed = spent + reserved;
+  const remaining = Math.max(0, total - committed);
+  const exceeded = Math.max(0, committed - total);
 
   return (
     <div>
@@ -1184,7 +1192,11 @@ function BudgetRow({ label, spent, total, percent, color, onEdit, expanded, edit
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
           <p className="text-[12px] font-semibold">{label}</p>
           <div className="text-right text-[13px] sm:text-sm">
-            <p><span className="text-[#9a9da1]">Potrošeno:</span> <span className="font-bold text-[#4d5054]">{formatMoney(spent)} €</span> <span className="text-[#9a9da1]">od {formatMoney(total)} €</span></p>
+            <p>
+              <span className="text-[#9a9da1]">Potrošeno:</span> <span className="font-bold text-[#4d5054]">{formatMoney(spent)} €</span>
+              {showReserved && <> <span className="text-[#9a9da1]">· Rezervisano:</span> <span className="font-bold text-[#4d5054]">{formatMoney(reserved)} €</span></>}
+              {" "}<span className="text-[#9a9da1]">od {formatMoney(total)} €</span>
+            </p>
             {exceeded > 0 ? (
               <p className="mt-0.5 font-semibold text-red-600">Limit prekoračen za {formatMoney(exceeded)} €</p>
             ) : (
