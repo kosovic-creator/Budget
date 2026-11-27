@@ -628,11 +628,11 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
 
       <main className="pb-[calc(88px+env(safe-area-inset-bottom))] lg:ml-[240px] lg:pb-0">
         <header className="sticky top-0 z-20 flex min-h-[72px] items-center justify-between border-b border-zinc-200/80 bg-white/85 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-xl md:h-[76px] md:px-8 md:py-0 lg:static lg:px-10">
-          <div>
+          <div className={cn(activeNav === "Pregled" && "hidden md:block")}>
             <p className="capitalize text-[11px] font-semibold text-zinc-400 md:text-[12px]">{currentPeriod}</p>
             <h1 className="text-[19px] font-bold tracking-tight text-zinc-900 md:text-[21px]">{activeNav}</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className={cn("flex items-center gap-2", activeNav === "Pregled" && "w-full justify-between md:w-auto")}>
             {activeNav === "Pregled" && (
               <button
                 type="button"
@@ -646,16 +646,16 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                   }
                 }}
                 disabled={budgetSaving || plannedItemSaving}
-                className={cn("min-h-11 rounded-xl px-2 py-2 text-[10px] leading-tight font-bold shadow-sm transition disabled:opacity-60 sm:px-4 sm:text-sm", editingBudget ? "bg-[#31724a] text-white hover:bg-[#285f3e]" : "bg-[#202124] text-white hover:bg-[#34363a]")}
+                className={cn("inline-flex min-h-11 items-center justify-center gap-1 rounded-xl px-2 py-2 text-[10px] leading-tight font-bold shadow-sm transition disabled:opacity-60 sm:px-4 sm:text-sm", activeNav === "Pregled" && "flex-1 whitespace-nowrap md:flex-none", editingBudget ? "bg-[#31724a] text-white hover:bg-[#285f3e]" : "bg-[#202124] text-white hover:bg-[#34363a]")}
               >
-                {editingBudget ? "Završi unos" : "Dodaci i rezervacije"}
+                {editingBudget ? "Završi unos" : <><Plus size={14} aria-hidden /> Dodaci i rezervacije</>}
               </button>
             )}
             <button
               onClick={() => { setNewTransactionType("expense"); setTransactionTitle(""); setTitleSuggestionsOpen(false); setFormError(""); setIsModalOpen(true); }}
-              className="ml-1 flex h-11 w-11 items-center justify-center gap-2 rounded-2xl bg-zinc-900 text-[13px] font-bold text-white shadow-lg shadow-zinc-900/15 transition hover:bg-zinc-800 active:scale-95 sm:w-auto sm:px-4"
+              className={cn("ml-1 flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-zinc-900 text-[13px] font-bold text-white shadow-lg shadow-zinc-900/15 transition hover:bg-zinc-800 active:scale-95 sm:w-auto sm:px-4", activeNav === "Pregled" && "ml-0 w-auto flex-1 text-[10px] sm:text-sm md:ml-1 md:flex-none")}
             >
-              <Plus size={18} /> <span className="hidden sm:inline">Nova transakcija</span>
+              <Plus size={18} /> <span className={activeNav === "Pregled" ? "inline" : "hidden sm:inline"}>Nova transakcija</span>
             </button>
             <button type="button" onClick={openPasswordDialog} aria-label="Otvori profil" aria-haspopup="dialog" title="Profil" className="grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition active:scale-95 lg:hidden">
               <span className="grid size-full place-items-center text-[11px] font-bold">{avatar}</span>
