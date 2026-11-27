@@ -183,14 +183,14 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
     }
   }
   const { confirmRemoval, confirmation } = useConfirmation();
-  const [draftBudget, setDraftBudget] = useState(initialBudget);
-  const [emptyBudgetFields, setEmptyBudgetFields] = useState<Partial<Record<keyof BudgetSettings, boolean>>>({});
   const [editingBudget, setEditingBudget] = useState(false);
   const [cashTransferOpen, setCashTransferOpen] = useState(false);
   const [budgetSaving, setBudgetSaving] = useState(false);
   const [budgetMessage, setBudgetMessage] = useState("");
   const [quickBalanceField, setQuickBalanceField] = useState<"otp" | "cash" | "nlb" | null>(null);
   const [quickBalanceValue, setQuickBalanceValue] = useState("");
+  const [editingLimitField, setEditingLimitField] = useState<"household" | "personal" | null>(null);
+  const [limitValue, setLimitValue] = useState("");
 
   function toggleQuickBalanceEditor(field: "otp" | "cash" | "nlb", currentValue: number) {
     if (quickBalanceField === field) {
@@ -227,7 +227,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         return;
       }
       setBudget(next);
-      setDraftBudget(next);
       setQuickBalanceField(null);
       setCashTransferOpen(false);
       const savedMessage = quickBalanceField === "otp"
@@ -243,20 +242,46 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
     }
   }
 
-  async function submitBudget(event: React.FormEvent<HTMLFormElement>) {
+  function toggleLimitEditor(field: "household" | "personal", currentLimit: number) {
+    if (editingLimitField === field) {
+      setEditingLimitField(null);
+      return;
+    }
+    setLimitValue(String(Math.round(currentLimit * 100) / 100));
+    setBudgetMessage("");
+    setEditingLimitField(field);
+  }
+
+  async function saveLimit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (budgetSaving || plannedItemSaving) return;
+    if (budgetSaving || !editingLimitField) return;
+    const enteredValue = Number(new FormData(event.currentTarget).get("limit"));
+    const spent = editingLimitField === "household" ? householdSpent : personalSpent;
+    if (!Number.isFinite(enteredValue) || enteredValue < -spent || enteredValue > 9_999_999_999.99 - spent) {
+      setBudgetMessage("Unesite ispravan mjesečni limit.");
+      return;
+    }
+
     const next = {
-      ...draftBudget,
-      other: 0,
+      ...budget,
+      [editingLimitField]: Math.round((enteredValue + spent) * 100) / 100,
     };
-    setBudgetSaving(true); setBudgetMessage("");
+    setBudgetSaving(true);
+    setBudgetMessage("");
     try {
       const result = await saveBudget(next);
-      if (result.success) { setBudget(next); setEditingBudget(false); setCashTransferOpen(false); setBudgetMessage("Stanje i plan su sačuvani."); }
-      else setBudgetMessage(result.message);
-    } catch { setBudgetMessage("Podaci nijesu sačuvani. Pokušajte ponovo."); }
-    finally { setBudgetSaving(false); }
+      if (!result.success) {
+        setBudgetMessage(result.message);
+        return;
+      }
+      setBudget(next);
+      setEditingLimitField(null);
+      setBudgetMessage(`Mjesečni limit za ${editingLimitField === "household" ? "kućne" : "lične"} troškove je sačuvan.`);
+    } catch {
+      setBudgetMessage("Mjesečni limit nije sačuvan. Pokušajte ponovo.");
+    } finally {
+      setBudgetSaving(false);
+    }
   }
 
   const maxCashTransfer = Math.max(0, Math.min(
@@ -288,7 +313,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         return;
       }
       setBudget(next);
-      setDraftBudget(next);
       setQuickBalanceValue(String(next.cash));
       setCashTransferOpen(false);
       setBudgetMessage("Prenos na OTP je sačuvan.");
@@ -387,7 +411,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
   function applyUpdatedLimits(limits: { household: number; personal: number } | null) {
     if (!limits) return;
     setBudget((current) => ({ ...current, ...limits }));
-    setDraftBudget((current) => ({ ...current, ...limits }));
   }
 
   async function addPlannedItem(event: React.FormEvent<HTMLFormElement>, kind: PlannedItemKind) {
@@ -432,7 +455,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         return;
       }
       setBudget((current) => ({ ...current, cash: result.cash }));
-      setDraftBudget((current) => ({ ...current, cash: Math.round((result.cash + current.cash - budget.cash) * 100) / 100 }));
       setPlannedItems((current) => current.filter((entry) => entry.id !== item.id));
       setBudgetMessage(`„${item.description}“ je prenesen u keš (${formatMoney(item.amount)} €).`);
     } catch {
@@ -454,7 +476,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         return;
       }
       setBudget((current) => ({ ...current, otp: result.otp }));
-      setDraftBudget((current) => ({ ...current, otp: Math.round((result.otp + current.otp - budget.otp) * 100) / 100 }));
       setPlannedItems((current) => current.filter((entry) => entry.id !== item.id));
       setBudgetMessage(`„${item.description}“ je prenesen na OTP (${formatMoney(item.amount)} €).`);
     } catch {
@@ -614,13 +635,20 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
           <div className="flex items-center gap-2">
             {activeNav === "Pregled" && (
               <button
-                type={editingBudget ? "submit" : "button"}
-                form={editingBudget ? "budget-settings-form" : undefined}
-                onClick={editingBudget ? undefined : (event) => { event.preventDefault(); setDraftBudget(budget); setEmptyBudgetFields({}); setEditingBudget(true); setBudgetMessage(""); }}
+                type="button"
+                onClick={() => {
+                  if (editingBudget) {
+                    setEditingBudget(false);
+                    setCashTransferOpen(false);
+                  } else {
+                    setEditingBudget(true);
+                    setBudgetMessage("");
+                  }
+                }}
                 disabled={budgetSaving || plannedItemSaving}
                 className={cn("min-h-11 rounded-xl px-2.5 py-2 text-xs sm:px-4 sm:text-sm font-bold shadow-sm transition disabled:opacity-60", editingBudget ? "bg-[#31724a] text-white hover:bg-[#285f3e]" : "bg-[#202124] text-white hover:bg-[#34363a]")}
               >
-                {editingBudget ? (budgetSaving ? "Čuvanje..." : "✓ Sačuvaj i završi") : <><span className="sm:hidden">Unos plana</span><span className="hidden sm:inline">Unos stanja i plana</span></>}
+                {editingBudget ? "Završi unos" : <><span className="sm:hidden">Unos plana</span><span className="hidden sm:inline">Unos stanja i plana</span></>}
               </button>
             )}
             <button
@@ -643,25 +671,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
               <SummaryCard featured title="Slobodno" value={`${availableAfterPlans < 0 ? "−" : ""}${formatMoney(availableAfterPlans)} €`} icon={<Target size={18} />} tone={availableAfterPlans < 0 ? "danger" : availableAfterPlans === 0 ? "success" : "info"} trend="Ukupno stanje − očekivani troškovi − kućni i lični limit" />
               {editingBudget && (
                 <section aria-label="Unos stanja i plana" className="col-span-2 min-w-0 space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 md:p-6">
-                  <form id="budget-settings-form" onSubmit={submitBudget} className="grid gap-3 border-t border-[#e7e8ea] pt-4 sm:grid-cols-2">
-                    {([
-                      ["household", "Mjesečni limit za kućne troškove"],
-                      ["personal", "Mjesečni limit za lične troškove"],
-                    ] as const).map(([key, label]) => (
-                      <div key={key} className="flex items-end gap-2">
-                      <label className="min-w-0 flex-1 text-sm font-bold text-[#555a60]">
-                        {label} (€)
-                        <input name={key} type="number" inputMode="decimal" required min={-deductions[key]} max={9999999999.99 - deductions[key]} step="0.01" value={emptyBudgetFields[key] ? "" : Math.round((draftBudget[key] - deductions[key]) * 100) / 100} onChange={(event) => {
-                          const amount = event.currentTarget.valueAsNumber;
-                          const isEmpty = event.currentTarget.value === "";
-                          setEmptyBudgetFields((current) => ({ ...current, [key]: isEmpty }));
-                          if (!Number.isFinite(amount)) return;
-                          setDraftBudget((current) => ({ ...current, [key]: Math.round((amount + deductions[key]) * 100) / 100 }));
-                        }} disabled={budgetSaving} className="mt-2 h-14 w-full rounded-xl border-2 border-[#cfd3d6] px-4 text-xl font-extrabold tracking-tight outline-none focus:border-[#6f8173]" />
-                      </label>
-                      </div>
-                    ))}
-                  </form>
                   <div className="grid gap-3 border-t border-[#e7e8ea] pt-4 md:grid-cols-2">
                     <PlannedItemsCard title="Dodaci" subtitle="Sigurni budući prilivi" kind="addition" items={plannedItems} total={additionsTotal} formOpen={plannedItemForm === "addition"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "addition" ? null : "addition"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} onAddToCash={addToCash} onAddToOtp={addToOtp} />
                     <PlannedItemsCard title="Očekivani troškovi" subtitle="Umanjuju izabrani mjesečni limit" kind="expectedExpense" items={plannedItems} total={expectedExpensesTotal} formOpen={plannedItemForm === "expectedExpense"} saving={plannedItemSaving} onToggleForm={() => { setPlannedItemForm(plannedItemForm === "expectedExpense" ? null : "expectedExpense"); setPlannedItemMessage(""); }} onSubmit={addPlannedItem} onEdit={editPlannedItem} onDelete={removePlannedItem} />
@@ -747,7 +756,32 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
                     ["Lični troškovi", budget.personal, "#b9a578"],
                   ] as const).map(([label, total, color]) => {
                     const spent = Math.abs(transactions.filter(item => item.type === "expense" && item.category === label).reduce((sum, item) => sum + item.amount, 0));
-                    return <BudgetRow key={label} label={label} spent={spent} total={total} percent={total > 0 ? Math.min(100, spent / total * 100) : 0} color={color} />;
+                    const field = label === "Kućni troškovi" ? "household" : "personal";
+                    return (
+                      <BudgetRow
+                        key={label}
+                        label={label}
+                        spent={spent}
+                        total={total}
+                        percent={total > 0 ? Math.min(100, spent / total * 100) : 0}
+                        color={color}
+                        onEdit={() => toggleLimitEditor(field, total - spent)}
+                        expanded={editingLimitField === field}
+                        editor={editingLimitField === field ? (
+                          <form onSubmit={saveLimit} className="mt-3 rounded-xl bg-zinc-50 p-3">
+                            <label className="block text-sm font-bold text-[#555a60]">
+                              Mjesečni limit za {field === "household" ? "kućne" : "lične"} troškove (€)
+                              <input name="limit" type="number" inputMode="decimal" required min={-spent} max={9_999_999_999.99 - spent} step="0.01" value={limitValue} onChange={(event) => setLimitValue(event.target.value)} autoFocus disabled={budgetSaving}
+                                className="mt-2 h-12 w-full rounded-xl border-2 border-[#cfd3d6] bg-white px-3 text-lg font-extrabold tracking-tight outline-none focus:border-[#6f8173] disabled:opacity-60" />
+                            </label>
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <button type="submit" disabled={budgetSaving} className="min-h-10 rounded-xl bg-zinc-900 px-3 text-sm font-bold text-white disabled:opacity-50">{budgetSaving ? "Čuvanje…" : "Sačuvaj"}</button>
+                              <button type="button" onClick={() => setEditingLimitField(null)} disabled={budgetSaving} className="min-h-10 rounded-xl border border-zinc-200 px-3 text-sm font-bold disabled:opacity-50">Otkaži</button>
+                            </div>
+                          </form>
+                        ) : undefined}
+                      />
+                    );
                   })}
                   <BudgetRow
                     label="Redovni troškovi"
@@ -813,7 +847,6 @@ export default function Dashboard({ initialTransactions, initialBudget, initialP
         ) : (
           <BankAccounts accounts={bankAccounts} setAccounts={setBankAccounts} onOtpTransfer={(otp) => {
             setBudget((current) => ({ ...current, otp }));
-            setDraftBudget((current) => ({ ...current, otp }));
           }} />
         )}
       </main>
@@ -1136,28 +1169,36 @@ interface BudgetRowProps {
   total: number;
   percent: number;
   color: string;
+  onEdit?: () => void;
+  expanded?: boolean;
+  editor?: React.ReactNode;
 }
 
-function BudgetRow({ label, spent, total, percent, color }: BudgetRowProps) {
+function BudgetRow({ label, spent, total, percent, color, onEdit, expanded, editor }: BudgetRowProps) {
   const remaining = Math.max(0, total - spent);
   const exceeded = Math.max(0, spent - total);
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
-        <p className="text-[12px] font-semibold">{label}</p>
-        <div className="text-right text-[13px] sm:text-sm">
-          <p><span className="text-[#9a9da1]">Potrošeno:</span> <span className="font-bold text-[#4d5054]">{formatMoney(spent)} €</span> <span className="text-[#9a9da1]">od {formatMoney(total)} €</span></p>
-          {exceeded > 0 ? (
-            <p className="mt-0.5 font-semibold text-red-600">Limit prekoračen za {formatMoney(exceeded)} €</p>
-          ) : (
-            <p className="mt-0.5 font-semibold text-[#66816d]">Preostalo: {formatMoney(remaining)} €</p>
-          )}
+      <div className="relative">
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+          <p className="text-[12px] font-semibold">{label}</p>
+          <div className="text-right text-[13px] sm:text-sm">
+            <p><span className="text-[#9a9da1]">Potrošeno:</span> <span className="font-bold text-[#4d5054]">{formatMoney(spent)} €</span> <span className="text-[#9a9da1]">od {formatMoney(total)} €</span></p>
+            {exceeded > 0 ? (
+              <p className="mt-0.5 font-semibold text-red-600">Limit prekoračen za {formatMoney(exceeded)} €</p>
+            ) : (
+              <p className="mt-0.5 font-semibold text-[#66816d]">Preostalo: {formatMoney(remaining)} €</p>
+            )}
+          </div>
         </div>
+        <div className="h-2.5 overflow-hidden rounded-full bg-zinc-100">
+          <div className="h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: color }} />
+        </div>
+        {onEdit && <button type="button" aria-label={`Uredi limit: ${label}`} aria-expanded={expanded} onClick={onEdit}
+          className="absolute inset-0 cursor-pointer rounded-lg hover:bg-zinc-900/[0.02] focus-visible:outline-2 focus-visible:outline-emerald-600" />}
       </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-zinc-100">
-        <div className="h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: color }} />
-      </div>
+      {editor}
     </div>
   );
 }
