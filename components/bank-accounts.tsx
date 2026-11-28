@@ -157,7 +157,7 @@ export default function BankAccounts({ accounts, setAccounts, onOtpTransfer }: B
                   <p className="text-sm font-bold">Planirani odbici</p>
                   {account.deductions.map((deduction) => (
                     <div key={deduction.id} className="mt-2 flex items-center gap-3 rounded-xl bg-zinc-50 px-3 py-2.5">
-                      <span className="min-w-0 flex-1 truncate text-sm">{deduction.description}</span><strong className="shrink-0 text-sm">−{money(deduction.amount)} €</strong>
+                      <span className="min-w-0 flex-1 truncate text-sm">{deduction.description}</span><strong className="shrink-0 text-sm">{money(deduction.amount)} €</strong>
                       <button type="button" onClick={() => removeDeduction(account.id, deduction.id)} disabled={busy === deduction.id} aria-label={`Ukloni odbitak ${deduction.description}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-zinc-500 transition hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button>
                     </div>
                   ))}
